@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Palpite Overlay</title>
+  <link rel="stylesheet" href="assets/css/palpite-overlay.css?v=3">
+</head>
+
+<body class="ov-body">
+  <div class="ov-wrap">
+    <div id="overlayError" class="ov-error" style="display:none"></div>
+
+    <section class="ov-card ov-head">
+      <div class="ov-head-left">
+        <div class="ov-title">💰 <span>Palpite Exato</span></div>
+
+        <div class="ov-meta">
+          <div class="ov-chip">
+            <span class="ov-chip-label">Compra</span>
+            <span id="ovBuy" class="ov-chip-val">—</span>
+          </div>
+
+          <div class="ov-chip">
+            <span class="ov-chip-label">Total</span>
+            <span id="ovTotal" class="ov-chip-val">0</span>
+          </div>
+        </div>
+
+        <div id="ovSub" class="ov-sub">Aguardando…</div>
+      </div>
+
+      <div id="ovStatus" class="ov-status ov-status--closed">FECHADO</div>
+    </section>
+
+    <section class="ov-card ov-winners">
+      <div class="ov-winners-head">
+        <div class="ov-winners-title">🏆 Top vencedores</div>
+        <div id="ovWinnersHint" class="ov-winners-hint">Aguardando verificação…</div>
+      </div>
+
+      <div id="ovWinners" class="ov-winners-grid"></div>
+    </section>
+
+    <div id="ovToastHost" class="ov-toasts"></div>
+  </div>
+
+  <script src="assets/js/palpiteadmin.js?v=3" defer></script>
+</body>
+</html>

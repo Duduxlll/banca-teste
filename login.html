@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Banquinhas • Login</title>
+  <link rel="stylesheet" href="assets/css/login.css">
+</head>
+<body>
+  <main class="login-wrap">
+    <div class="card">
+      <h1>Entrar</h1>
+      <p class="muted">Acesse a área segura</p>
+      <form id="loginForm">
+        <label>Usuário</label>
+        <input class="input" id="user" autocomplete="username" required>
+        <label>Senha</label>
+        <input class="input" id="pass" type="password" autocomplete="current-password" required>
+        <button class="cta" type="submit">Entrar</button>
+        <div class="error" id="err" role="alert"></div>
+      </form>
+    </div>
+  </main>
+  <script src="assets/js/login.js"></script>
+</body>
+</html>

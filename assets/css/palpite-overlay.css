@@ -1,0 +1,323 @@
+:root{
+  --w: 420px;
+  --pad: 12px;
+  --radius: 16px;
+
+  
+  --glass:  rgba(70, 70, 82, .88);
+  --glass2: rgba(52, 52, 62, .76);
+
+
+  --border: rgba(255,255,255,.26);
+
+ 
+  --text: rgba(255,255,255,.96);
+  --muted: rgba(255,255,255,.80);
+
+  --ok: rgba(46, 204, 113, 1);
+  --bad: rgba(231, 76, 60, 1);
+  --gold: rgba(255, 205, 75, 1);
+
+  
+  --shadow: 0 16px 55px rgba(0,0,0,.28);
+}
+
+*{ box-sizing: border-box; }
+
+.ov-body{
+  margin:0;
+  background: transparent !important;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  color: var(--text);
+}
+
+/* ✅ deixa o overlay mais “nítido” no vídeo */
+.ov-body, .ov-card, .ov-win, .ov-chip, .ov-status, .ov-toast{
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.ov-title, .ov-name, .ov-val, .ov-status, .ov-chip-val, .ov-winners-title{
+  text-shadow: 0 1px 2px rgba(0,0,0,.35);
+}
+
+/* container do overlay */
+.ov-wrap{
+  position: fixed;
+  left: 18px;
+  top: 18px;
+  width: var(--w);
+  max-width: calc(100vw - 36px);
+  display: grid;
+  gap: 10px;
+}
+
+/* cards base */
+.ov-card{
+  background: linear-gradient(180deg, var(--glass), var(--glass2));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(8px) saturate(1.10);
+  -webkit-backdrop-filter: blur(8px) saturate(1.10);
+  overflow: hidden;
+}
+
+/* HEADER */
+.ov-head{
+  padding: var(--pad);
+  display:flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.ov-head-left{ display:flex; flex-direction: column; gap: 8px; min-width: 0; }
+
+.ov-title{
+  font-weight: 900;
+  font-size: 16px;
+  letter-spacing: .2px;
+  display:flex;
+  gap: 8px;
+  align-items:center;
+}
+
+.ov-meta{
+  display:flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ov-chip{
+  display:flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.22);
+  background: rgba(255,255,255,.14);
+}
+
+.ov-chip-label{
+  font-size: 11px;
+  font-weight: 800;
+  opacity: .88;
+}
+
+.ov-chip-val{
+  font-size: 12px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.ov-sub{
+  font-size: 12px;
+  opacity: .90;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ov-status{
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: .5px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.24);
+  background: rgba(255,255,255,.14);
+  min-width: 86px;
+  text-align:center;
+  align-self: flex-start;
+  user-select: none;
+}
+
+.ov-status--open{
+  border-color: rgba(46,204,113,.45);
+  background: rgba(46,204,113,.22);
+  box-shadow: 0 0 0 6px rgba(46,204,113,.10);
+  animation: ovPulse 1.6s ease-in-out infinite;
+}
+
+.ov-status--closed{
+  border-color: rgba(231,76,60,.45);
+  background: rgba(231,76,60,.20);
+}
+
+@keyframes ovPulse{
+  0%,100%{ box-shadow: 0 0 0 6px rgba(46,204,113,.10); }
+  50%{ box-shadow: 0 0 0 10px rgba(46,204,113,.16); }
+}
+
+/* WINNERS */
+.ov-winners{
+  padding: 10px 12px 12px;
+}
+
+.ov-winners-head{
+  display:flex;
+  align-items:center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.ov-winners-title{
+  font-weight: 950;
+  font-size: 13px;
+  letter-spacing: .2px;
+}
+
+.ov-winners-hint{
+  font-size: 11px;
+  opacity: .82;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.ov-winners-grid{
+  display: grid;
+  gap: 8px;
+}
+
+.ov-win{
+  display:flex;
+  align-items:center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 10px;
+  border-radius: 14px;
+
+  /* ✅ mais claro */
+  border: 1px solid rgba(255,255,255,.22);
+  background: rgba(255,255,255,.16);
+
+  animation: ovIn .18s ease-out;
+}
+
+.ov-win-left{
+  display:flex;
+  align-items:center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.ov-rank{
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight: 950;
+  font-size: 12px;
+  background: rgba(255, 205, 75, .26);
+  border: 1px solid rgba(255, 205, 75, .46);
+  color: rgba(255,255,255,.98);
+}
+
+.ov-name{
+  font-weight: 900;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 230px;
+}
+
+.ov-win-right{
+  display:flex;
+  align-items: baseline;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+.ov-val{
+  font-weight: 950;
+  font-variant-numeric: tabular-nums;
+}
+
+.ov-delta{
+  font-size: 11px;
+  opacity: .86;
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes ovIn{
+  from{ opacity:0; transform: translateY(6px) scale(.985); }
+  to{ opacity:1; transform:none; }
+}
+
+/* TOASTS (entrada ao vivo) */
+.ov-toasts{
+  position: relative;
+  height: 0;
+}
+
+.ov-toast{
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  padding: 12px 12px;
+  border-radius: 16px;
+
+  /* ✅ mais claro e bem legível */
+  border: 1px solid rgba(255,255,255,.24);
+  background: rgba(78, 78, 92, .92);
+
+  backdrop-filter: blur(8px) saturate(1.10);
+  -webkit-backdrop-filter: blur(8px) saturate(1.10);
+  box-shadow: 0 16px 60px rgba(0,0,0,.30);
+
+  display:flex;
+  align-items:center;
+  justify-content: space-between;
+  gap: 10px;
+  animation: toastIn .20s ease-out;
+}
+
+@keyframes toastIn{
+  from{ opacity:0; transform: translateY(10px) scale(.98); }
+  to{ opacity:1; transform:none; }
+}
+
+.ov-toast.hide{
+  opacity:0;
+  transform: translateY(10px) scale(.98);
+  transition: .22s ease;
+}
+
+.ov-toast .t-left{
+  display:flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ov-toast .t-name{
+  font-weight: 950;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow:hidden;
+  text-overflow: ellipsis;
+}
+.ov-toast .t-sub{
+  font-size: 11px;
+  opacity: .82;
+}
+.ov-toast .t-val{
+  font-weight: 950;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ERRO */
+.ov-error{
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(231,76,60,.50);
+  background: rgba(231,76,60,.22);
+  font-weight: 800;
+  font-size: 12px;
+}
