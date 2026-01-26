@@ -36,10 +36,40 @@
     return dt.toLocaleString('pt-BR');
   };
 
-  function notify(msg, type = 'ok') {
-    if (typeof window.notify === 'function') return window.notify(msg, type);
-    alert(msg);
-  }
+  function ensureToastEl(){
+  let el = document.querySelector('#appToast');
+  if (el) return el;
+  el = document.createElement('div');
+  el.id = 'appToast';
+  el.className = 'toast';
+  document.body.appendChild(el);
+  return el;
+}
+
+function toast(msg, type='ok'){
+  const el = ensureToastEl();
+  el.textContent = String(msg || '');
+  el.classList.remove('show','toast--ok','toast--error','toast--info');
+  const t = (type === 'error') ? 'toast--error' : (type === 'info' ? 'toast--info' : 'toast--ok');
+  el.classList.add(t);
+  requestAnimationFrame(() => el.classList.add('show'));
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => el.classList.remove('show'), 2600);
+}
+
+if (typeof window.notify !== 'function') {
+  window.notify = (msg, type) => {
+    const v = String(type || 'ok').toLowerCase();
+    if (v === 'error' || v === 'no' || v === 'bad') return toast(msg, 'error');
+    if (v === 'info') return toast(msg, 'info');
+    return toast(msg, 'ok');
+  };
+}
+
+function notify(msg, type='ok'){
+  window.notify(msg, type);
+}
+
 
   function maskPixKey(key = '') {
     const k = String(key || '').trim();

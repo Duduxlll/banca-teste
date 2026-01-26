@@ -376,3 +376,143 @@ dialog.cb-modal::backdrop {
     width: auto;
   }
 }
+
+#tab-cashbacks .card{
+  border:1px solid rgba(65,245,160,.22);
+  box-shadow:0 22px 80px rgba(0,0,0,.62);
+}
+
+#tab-cashbacks .table-wrap{
+  border-radius:16px;
+  border:1px solid rgba(65,245,160,.12);
+}
+
+#tab-cashbacks table.table thead th{
+  background:rgba(0,0,0,.16);
+  color:rgba(240,246,255,.92);
+}
+
+#tab-cashbacks table.table tbody td{
+  color:rgba(240,246,255,.90);
+}
+
+#tab-cashbacks table.table tbody tr:hover td{
+  background:rgba(65,245,160,.05);
+}
+
+#tab-cashbacks select.input{
+  appearance:none;
+  background:rgba(0,0,0,.18);
+  border:1px solid rgba(65,245,160,.22);
+  color:#eef5ff;
+}
+
+#tab-cashbacks select.input option{
+  background:#0b1116;
+  color:#eef5ff;
+}
+
+.cb-badge{
+  border:1px solid rgba(255,255,255,.18);
+  box-shadow:0 10px 30px rgba(0,0,0,.35);
+}
+
+.cb-badge--pend{
+  background:rgba(255,214,102,.20);
+  border-color:rgba(255,214,102,.46);
+  color:#fff3c4;
+}
+
+.cb-badge--ok{
+  background:rgba(65,245,160,.18);
+  border-color:rgba(65,245,160,.50);
+  color:#d9ffe9;
+}
+
+.cb-badge--no{
+  background:rgba(255,90,90,.18);
+  border-color:rgba(255,90,90,.50);
+  color:#ffe0e0;
+}
+
+.cb-stats{
+  gap:10px;
+}
+
+.cb-pill{
+  border:1px solid rgba(255,255,255,.14);
+  background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.03));
+}
+
+.cb-stats .cb-pill:nth-child(1){
+  border-color:rgba(255,214,102,.40);
+  background:rgba(255,214,102,.10);
+}
+
+.cb-stats .cb-pill:nth-child(2){
+  border-color:rgba(65,245,160,.42);
+  background:rgba(65,245,160,.10);
+}
+
+.cb-stats .cb-pill:nth-child(3){
+  border-color:rgba(255,90,90,.42);
+  background:rgba(255,90,90,.10);
+}
+
+#cbCountPendente,#cbCountAprovado,#cbCountReprovado{
+  display:inline-block;
+  min-width:26px;
+  padding:3px 9px;
+  border-radius:999px;
+  font-variant-numeric:tabular-nums;
+}
+
+#cbCountPendente{
+  background:rgba(255,214,102,.18);
+  border:1px solid rgba(255,214,102,.46);
+}
+
+#cbCountAprovado{
+  background:rgba(65,245,160,.18);
+  border:1px solid rgba(65,245,160,.50);
+}
+
+#cbCountReprovado{
+  background:rgba(255,90,90,.18);
+  border:1px solid rgba(255,90,90,.50);
+}
+
+.toast{
+  position:fixed;
+  top:16px;
+  right:16px;
+  z-index:99999;
+  max-width:min(420px, calc(100vw - 32px));
+  padding:12px 14px;
+  border-radius:16px;
+  border:1px solid rgba(65,245,160,.35);
+  background:linear-gradient(180deg, rgba(16,20,34,.92), rgba(10,12,22,.92));
+  box-shadow:0 24px 70px rgba(0,0,0,.70);
+  color:#f2f4ff;
+  opacity:0;
+  transform:translateY(-10px);
+  pointer-events:none;
+  transition:opacity .18s ease, transform .18s ease;
+}
+
+.toast.show{
+  opacity:1;
+  transform:translateY(0);
+}
+
+.toast.toast--ok{
+  border-color:rgba(65,245,160,.45);
+}
+
+.toast.toast--error{
+  border-color:rgba(255,90,90,.55);
+}
+
+.toast.toast--info{
+  border-color:rgba(160,200,255,.45);
+}
