@@ -210,7 +210,7 @@ form?.addEventListener('submit', async (ev) => {
   }
 
   if (!screenshotDataUrl) {
-    submitResult.innerHTML = `<div class="msgTitle">Falta o print</div><div class="msgLine">Selecione a imagem do comprovante para enviar.</div>`;
+    submitResult.innerHTML = `<div class="msgTitle">Falta o print</div><div class="msgLine">Selecione print para enviar.</div>`;
     return;
   }
 
@@ -236,7 +236,7 @@ form?.addEventListener('submit', async (ev) => {
     submitResult.innerHTML =
       `<div class="msgTitle">Pedido enviado ✅</div>
        <div class="msgLine">Protocolo: <strong>${esc(data.id)}</strong></div>
-       <div class="msgLine">Acompanhe pelo chat com <strong>!status</strong>.</div>`;
+       <div class="msgLine">Acompanhe pelo chat se foi aprovado para receber seu cashback com <strong>!status</strong>.</div>`;
 
     form.reset();
     screenshotDataUrl = null;
