@@ -103,7 +103,8 @@ export function initTwitchBot({
       }
 
       if (cmd.type === "cashback") {
-        await say(`Cashback: envie aqui 👉 ${publicUrl}`);
+        const mention = userTag ? `@${userTag}` : `@${user}`;
+        await say(`${mention} envie seu cashback aqui 👉 ${publicUrl} (nick + pix + print do comprovante). Depois use !status pra acompanhar.`);
         return;
       }
 

@@ -3,7 +3,6 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-
   <title>Banquinhas • Sorteio Público</title>
 
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,33 +11,32 @@
   <link rel="stylesheet" href="assets/css/style.css">
   <link rel="stylesheet" href="assets/css/sorteio-publico.css">
 </head>
+
 <body class="sp-body">
   <header class="sp-header">
     <div class="sp-wrap sp-header-inner">
       <div class="sp-logo-block">
-        <div class="sp-logo-img" aria-hidden="true"></div>
-        <div>
+        <div class="sp-logo-img" aria-hidden="true">
+          <img class="sp-logo-photo" src="assets/img/banner.png" alt="">
+        </div>
+        <div class="sp-brandText">
           <h1 class="sp-title">Sorteio</h1>
           <p class="sp-subtitle">Sorteio Público da Live</p>
         </div>
       </div>
-      <div class="sp-header-badge">
-        🔥 Sorteio Do Guigz
-      </div>
+
+      <div class="sp-header-badge">🔥 Sorteio Do Guigz</div>
     </div>
   </header>
 
- <main class="sp-main">
+  <main class="sp-main">
     <div class="sp-wrap">
       <section class="sp-card">
-
-        
         <div class="sp-banner">
           <img src="assets/img/sorteio.png" alt="Sorteio Banquinhas" class="sp-banner-img">
           <div class="sp-banner-overlay"></div>
         </div>
 
-        
         <div class="sp-banner-info">
           <h2 class="sp-banner-title">Sorteio Do Guigz</h2>
           <p class="sp-banner-desc">
@@ -50,8 +48,6 @@
 
         <div class="sp-card-body">
           <div class="sp-grid">
-
-            
             <div class="sp-column">
               <h3 class="sp-section-title">Participar do sorteio</h3>
               <p class="sp-section-sub">
@@ -61,50 +57,29 @@
               <form id="sp-form" autocomplete="off" class="sp-form">
                 <label class="sp-field">
                   <span>Nome na Twitch <span class="sp-required">*</span></span>
-                  <input
-                    type="text"
-                    id="sp-nomeTwitch"
-                    maxlength="60"
-                    placeholder="ex: joao1234"
-                    required>
+                  <input type="text" id="sp-nomeTwitch" maxlength="60" placeholder="ex: joao1234" required>
                 </label>
 
                 <label class="sp-field">
                   <span>ID da BoraWin <span class="sp-required">*</span></span>
-                  <input
-                    type="text"
-                    id="sp-id"
-                    maxlength="60"
-                    placeholder="Digite seu ID único da BoraWin"
-                    required>
+                  <input type="text" id="sp-id" maxlength="60" placeholder="Digite seu ID único da BoraWin" required>
                   <small class="sp-help">
                     Use o ID oficial que você tem na BoraWIn.
                     Esse ID é único e usado para confirmar que você é o vencedor.
                   </small>
                 </label>
 
-                <button type="submit" class="sp-btn-primary" id="sp-btn-enviar">
-                  Entrar no sorteio
-                </button>
-
+                <button type="submit" class="sp-btn-primary" id="sp-btn-enviar">Entrar no sorteio</button>
                 <p id="sp-status" class="sp-status"></p>
               </form>
             </div>
 
-            
             <div class="sp-column sp-column-info">
               <h3 class="sp-section-title">Como funciona</h3>
               <ol class="sp-steps">
-                <li>
-                  <strong>Preencha seu nome da Twitch</strong> exatamente igual ao que aparece na live.
-                </li>
-                <li>
-                  Informe o <strong>seu ID da BoraWin</strong>. Ele deve ser único e apenas seu.
-              
-                </li>
-                <li>
-                  Clique em <strong>Entrar no sorteio</strong>. Sua inscrição vai para o painel do streamer.
-                </li>
+                <li><strong>Preencha seu nome da Twitch</strong> exatamente igual ao que aparece na live.</li>
+                <li>Informe o <strong>seu ID da BoraWin</strong>. Ele deve ser único e apenas seu.</li>
+                <li>Clique em <strong>Entrar no sorteio</strong>. Sua inscrição vai para o painel do streamer.</li>
                 <li>
                   Na tela dele existe uma <strong>roleta gigante</strong> com todos os nomes.
                   Ele gira ao vivo e, quando alguém ganha, vê o <strong>ID do vencedor</strong>
@@ -113,24 +88,20 @@
               </ol>
 
               <div class="sp-alert">
-                <strong>Atenção:</strong> cada ID só pode ser usado por
-                <strong>uma inscrição por vez</strong>. Se alguém tentar usar um ID que já está cadastrado,
-                o sistema bloqueia. O sorteio e as regras de premiação são definidos pelo streamer.
+                <strong>Atenção:</strong> cada ID só pode ser usado por <strong>uma inscrição por vez</strong>.
+                Se alguém tentar usar um ID que já está cadastrado, o sistema bloqueia.
+                O sorteio e as regras de premiação são definidos pelo streamer.
               </div>
             </div>
-
           </div>
         </div>
-
       </section>
     </div>
   </main>
 
-  <footer class="sp-footer">
-    © <span id="sp-ano"></span> Banquinhas • Sorteios
-  </footer>
+  <footer class="sp-footer">© <span id="sp-ano"></span> Banquinhas • Sorteios</footer>
 
- <div class="toast" id="toast"></div>
+  <div class="toast" id="toast"></div>
 
   <script src="assets/js/sorteio-publico.js"></script>
 </body>
