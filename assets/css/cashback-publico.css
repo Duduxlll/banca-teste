@@ -322,7 +322,7 @@ input:focus,select:focus,textarea:focus{
   .hint{font-size:.9rem}
 }
 
-/* === REMOVE AS MANCHAS (BLOBS) EM TODAS AS TELAS === */
+
 .bg,
 .blob{
   display: none !important;
