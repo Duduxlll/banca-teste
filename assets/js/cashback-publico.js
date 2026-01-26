@@ -21,8 +21,12 @@ const rankList = qs('#rankList');
 const apiStatus = qs('#apiStatus');
 const keyChip = qs('#keyChip');
 
-const params = new URLSearchParams(location.search);
-const key = params.get('key') || '';
+function getMeta(name) {
+  const el = document.querySelector(`meta[name="${name}"]`);
+  return el ? el.content : '';
+}
+
+const key = (window.APP_PUBLIC_KEY || getMeta('app-key') || '').trim();
 
 function setApiStatus(text) {
   apiStatus.textContent = text;
@@ -60,10 +64,12 @@ function formatDate(v) {
 
 async function apiFetch(url, opts = {}) {
   const headers = Object.assign({}, opts.headers || {});
-  headers['X-APP-KEY'] = key;
+  if (key) headers['X-APP-KEY'] = key;
+
   const res = await fetch(url, { ...opts, headers });
   let data = null;
   try { data = await res.json(); } catch {}
+
   if (!res.ok) {
     const msg = data?.error || `http_${res.status}`;
     throw new Error(msg);
@@ -118,7 +124,7 @@ form.addEventListener('submit', async (ev) => {
   ev.preventDefault();
 
   if (!key) {
-    submitResult.innerHTML = `<div class="msgTitle">Link inválido</div><div class="msgLine">Falta o parâmetro <strong>?key=</strong>.</div>`;
+    submitResult.innerHTML = `<div class="msgTitle">Configuração faltando</div><div class="msgLine">Defina <strong>&lt;meta name="app-key"&gt;</strong> no HTML.</div>`;
     return;
   }
 
@@ -181,7 +187,7 @@ async function checkStatus(user) {
   }
 
   if (!key) {
-    statusResult.innerHTML = `<div class="msgLine">Link sem <strong>?key=</strong>.</div>`;
+    statusResult.innerHTML = `<div class="msgLine">Falta configurar a <strong>app-key</strong> no HTML.</div>`;
     setBadge(statusBadge, 'Bloqueado', '');
     return;
   }
@@ -229,7 +235,7 @@ statusUser.addEventListener('keydown', (e) => {
 
 async function loadRanking() {
   if (!key) {
-    rankList.innerHTML = `<div class="muted">Falta <strong>?key=</strong> no link.</div>`;
+    rankList.innerHTML = `<div class="muted">Falta configurar a <strong>app-key</strong> no HTML.</div>`;
     return;
   }
 
@@ -261,7 +267,7 @@ async function loadRanking() {
 
 function init() {
   keyChip.textContent = key ? `Chave pública: ${key.slice(0, 6)}…${key.slice(-4)}` : 'Chave pública: ausente';
-  setApiStatus('ok');
+  setApiStatus(key ? 'ok' : 'sem app-key');
   loadRanking();
 }
 
