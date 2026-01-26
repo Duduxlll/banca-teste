@@ -359,3 +359,32 @@ dialog.cb-modal::backdrop{
 #appToast.toast.toast--info{
   border-color:rgba(0,163,255,.35) !important;
 }
+
+#tab-cashbacks .table-wrap{
+  overflow-x:auto !important;
+  overflow-y:visible !important;
+  overscroll-behavior:auto !important;
+}
+
+#tab-cashbacks .table{
+  border-collapse:separate !important;
+  border-spacing:0 !important;
+}
+
+#tab-cashbacks .table thead th{
+  border-right:1px solid rgba(0,255,150,.14) !important;
+  box-shadow:none !important;
+}
+
+#tab-cashbacks .table thead th:last-child{
+  border-right:0 !important;
+}
+
+#tab-cashbacks .table tbody td{
+  border-right:1px solid rgba(0,255,150,.08) !important;
+  box-shadow:none !important;
+}
+
+#tab-cashbacks .table tbody td:last-child{
+  border-right:0 !important;
+}
