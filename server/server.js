@@ -14,6 +14,8 @@ import crypto from 'crypto';
 import axios from 'axios';
 import QRCode from 'qrcode';
 import pkg from 'pg';
+import { ensureCashbackTables, registerCashbackRoutes } from './cashback-routes.js';
+
 import { initTwitchBot } from "./twitch-bot.js";
 
 const { Pool } = pkg;
@@ -129,7 +131,8 @@ app.use((req, res, next) => {
 });
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-app.use(express.json());
+app.use(express.json({ limit: '8mb' }));
+
 app.use(cookieParser());
 app.use(cors({ origin: ORIGIN, credentials: true }));
 app.use(express.static(ROOT, { extensions: ['html'] }));
@@ -232,6 +235,30 @@ function parseMoneyToCents(v){
   const n = Number.parseFloat(numStr);
   if (!Number.isFinite(n)) return null;
   return Math.round(n * 100);
+}
+
+function normalizeNick(v){
+  const s = String(v || '').trim();
+  if (!s) return '';
+  const noAt = s.startsWith('@') ? s.slice(1) : s;
+  return noAt.slice(0, 30);
+}
+
+function mapCashbackRow(row){
+  if (!row) return null;
+  return {
+    id: row.id,
+    twitchNick: row.twitch_nick,
+    pixType: row.pix_type,
+    pixKey: row.pix_key,
+    proofUrl: row.proof_url,
+    status: row.status,
+    motivo: row.motivo,
+    payoutPrazoHoras: row.payout_prazo_horas,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    decidedAt: row.decided_at
+  };
 }
 
 const PALPITE = {
@@ -388,7 +415,12 @@ app.use('/api', (req, res, next) => {
     '/api/cupons/resgatar',
     '/api/palpite/stream',
     '/api/palpite/guess',
-    '/api/palpite/state-public'
+    '/api/palpite/state-public',
+    '/api/cashbacks/submit',
+    '/api/cashbacks/status',
+    '/api/cashback/submit',
+    '/api/cashback/status',
+    '/api/cashback/ranking'
   ];
 
   if (openRoutes.some(r => req.path.startsWith(r.replace('/api','')))) {
@@ -1147,6 +1179,170 @@ app.post('/api/pix/confirmar', async (req, res) => {
   }
 });
 
+app.post('/api/cashbacks/submit', requireAppKey, async (req, res) => {
+  try{
+    const twitchNick = normalizeNick(req.body?.twitchNick ?? req.body?.nick ?? req.body?.user ?? req.body?.username);
+    const pixType = req.body?.pixType != null ? String(req.body.pixType).trim().slice(0, 40) : null;
+    const pixKeyRaw = req.body?.pixKey ?? req.body?.pix ?? req.body?.chavePix;
+    const pixKey = String(pixKeyRaw || '').trim().slice(0, 255);
+    const proofUrlRaw = req.body?.proofUrl ?? req.body?.printUrl ?? req.body?.screenshotUrl ?? req.body?.comprovanteUrl;
+    const proofUrl = proofUrlRaw != null ? String(proofUrlRaw).trim().slice(0, 800) : null;
+
+    if (!twitchNick || !pixKey) {
+      return res.status(400).json({ error:'dados_invalidos' });
+    }
+
+    const { rows: existing } = await q(
+      `select id, status, motivo, payout_prazo_horas, created_at, updated_at, decided_at
+         from cashbacks
+        where lower(twitch_nick) = lower($1)
+          and status = 'pendente'
+        order by created_at desc
+        limit 1`,
+      [twitchNick]
+    );
+    if (existing.length) {
+      return res.json({ ok:true, already:true, ...mapCashbackRow({ ...existing[0], twitch_nick: twitchNick, pix_type: null, pix_key: pixKey, proof_url: proofUrl }) });
+    }
+
+    const id = uid();
+    const { rows } = await q(
+      `insert into cashbacks (id, twitch_nick, pix_type, pix_key, proof_url, status, motivo, payout_prazo_horas, created_at, updated_at, decided_at)
+       values ($1,$2,$3,$4,$5,'pendente',null,null, now(), now(), null)
+       returning *`,
+      [id, twitchNick, pixType, pixKey, proofUrl]
+    );
+
+    sseSendAll('cashbacks-changed', { reason:'submit', id });
+    return res.status(201).json({ ok:true, ...mapCashbackRow(rows[0]) });
+  }catch(e){
+    console.error('cashbacks/submit:', e.message);
+    return res.status(500).json({ error:'falha_submit' });
+  }
+});
+
+app.get('/api/cashbacks/status', requireAppKey, async (req, res) => {
+  try{
+    const twitchNick = normalizeNick(req.query?.nick ?? req.query?.user ?? req.query?.username);
+    if (!twitchNick) return res.status(400).json({ error:'dados_invalidos' });
+
+    const { rows } = await q(
+      `select *
+         from cashbacks
+        where lower(twitch_nick) = lower($1)
+        order by created_at desc
+        limit 1`,
+      [twitchNick]
+    );
+
+    if (!rows.length) return res.status(404).json({ error:'not_found' });
+
+    const { rows: c } = await q(
+      `select count(*)::int as aprovados
+         from cashbacks
+        where lower(twitch_nick) = lower($1)
+          and status = 'aprovado'`,
+      [twitchNick]
+    );
+
+    return res.json({
+      ok:true,
+      aprovados: c?.[0]?.aprovados ?? 0,
+      ...mapCashbackRow(rows[0])
+    });
+  }catch(e){
+    console.error('cashbacks/status:', e.message);
+    return res.status(500).json({ error:'falha_status' });
+  }
+});
+
+app.get('/api/cashbacks', requireAdmin, async (req, res) => {
+  try{
+    const lim = Math.min(Math.max(parseInt(req.query?.limit || '600', 10) || 600, 1), 2000);
+    const { rows } = await q(
+      `select *
+         from cashbacks
+        order by created_at desc
+        limit ${lim}`
+    );
+    res.json(rows.map(mapCashbackRow));
+  }catch(e){
+    console.error('cashbacks/list:', e.message);
+    res.status(500).json({ error:'falha_list' });
+  }
+});
+
+app.get('/api/cashbacks/ranking', requireAdmin, async (req, res) => {
+  try{
+    const lim = Math.min(Math.max(parseInt(req.query?.limit || '10', 10) || 10, 1), 100);
+    const { rows } = await q(
+      `select twitch_nick as nick, count(*)::int as aprovados
+         from cashbacks
+        where status = 'aprovado'
+        group by twitch_nick
+        order by aprovados desc, nick asc
+        limit ${lim}`
+    );
+    res.json(rows);
+  }catch(e){
+    console.error('cashbacks/ranking:', e.message);
+    res.status(500).json({ error:'falha_ranking' });
+  }
+});
+
+app.patch('/api/cashbacks/:id', requireAdmin, async (req, res) => {
+  try{
+    const id = String(req.params.id || '').trim();
+    const status = String(req.body?.status || '').trim().toLowerCase();
+    const motivo = req.body?.motivo != null ? String(req.body.motivo).trim().slice(0, 500) : null;
+    const prazoHorasRaw = req.body?.prazoHoras;
+    const prazoHorasNum = prazoHorasRaw != null ? parseInt(prazoHorasRaw, 10) : null;
+    const prazoHoras = prazoHorasNum != null && Number.isFinite(prazoHorasNum) ? Math.max(1, Math.min(720, prazoHorasNum)) : null;
+
+    if (!id) return res.status(400).json({ error:'dados_invalidos' });
+    if (!['aprovado','reprovado','pendente'].includes(status)) {
+      return res.status(400).json({ error:'status_invalido' });
+    }
+    if (status === 'reprovado' && !motivo) {
+      return res.status(400).json({ error:'motivo_obrigatorio' });
+    }
+
+    const motivoFinal = status === 'pendente' ? null : (motivo || null);
+    const prazoFinal = status === 'aprovado' ? (prazoHoras || 24) : null;
+
+    const { rows } = await q(
+      `update cashbacks
+          set status = $2,
+              motivo = $3,
+              payout_prazo_horas = $4,
+              updated_at = now(),
+              decided_at = case when cashbacks.status <> $2 and $2 <> 'pendente' then now() else cashbacks.decided_at end
+        where id = $1
+        returning *`,
+      [id, status, motivoFinal, prazoFinal]
+    );
+
+    if (!rows.length) return res.status(404).json({ error:'not_found' });
+
+    sseSendAll('cashbacks-changed', { reason:'update', id });
+    res.json(mapCashbackRow(rows[0]));
+  }catch(e){
+    console.error('cashbacks/update:', e.message);
+    res.status(500).json({ error:'falha_update' });
+  }
+});
+
+
+
+registerCashbackRoutes({
+  app,
+  q,
+  uid,
+  requireAppKey,
+  requireAuth,
+  requireAdmin,
+  sseSendAll
+});
 
 
 const areaAuth = [requireAuth];
@@ -1895,6 +2091,32 @@ async function ensurePalpiteTables(){
   }
 }
 
+async function ensureCashbacksTable(){
+  try{
+    await q(`
+      CREATE TABLE IF NOT EXISTS cashbacks (
+        id TEXT PRIMARY KEY,
+        twitch_nick TEXT NOT NULL,
+        pix_type TEXT,
+        pix_key TEXT NOT NULL,
+        proof_url TEXT,
+        status TEXT NOT NULL DEFAULT 'pendente',
+        motivo TEXT,
+        payout_prazo_horas INTEGER,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        decided_at TIMESTAMPTZ
+      )
+    `);
+
+    await q(`CREATE INDEX IF NOT EXISTS cashbacks_created_at_idx ON cashbacks (created_at DESC)`);
+    await q(`CREATE INDEX IF NOT EXISTS cashbacks_nick_idx ON cashbacks (lower(twitch_nick))`);
+    await q(`CREATE INDEX IF NOT EXISTS cashbacks_status_idx ON cashbacks (status)`);
+  }catch(e){
+    console.error('ensureCashbacksTable:', e.message);
+  }
+}
+
 let twitchBot = { enabled: false, say: async () => {} };
 
 app.listen(PORT, async () => {
@@ -1902,9 +2124,11 @@ app.listen(PORT, async () => {
     await q('select 1');
     await ensureMessageColumns();
     await ensureCuponsTable();
-
+    await ensureCashbacksTable();
     await ensurePalpiteTables();
     await palpiteLoadFromDB();
+    await ensureCashbackTables(q);
+
 
     console.log('🗄️  Postgres conectado');
   } catch(e){

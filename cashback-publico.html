@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Cashback</title>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/cashback.css">
+</head>
+<body>
+  <div class="bg">
+    <div class="blob b1"></div>
+    <div class="blob b2"></div>
+    <div class="blob b3"></div>
+  </div>
+
+  <header class="top">
+    <div class="brand">
+      <div class="logo">CB</div>
+      <div class="brandText">
+        <div class="brandTitle">Cashback</div>
+        <div class="brandSub">Envie seu pedido e acompanhe o status</div>
+      </div>
+    </div>
+
+    <div class="chip" id="keyChip">Chave pública: carregando…</div>
+  </header>
+
+  <main class="grid">
+    <section class="card">
+      <div class="cardHead">
+        <h2>Solicitar cashback</h2>
+        <div class="badge live" id="submitBadge">Formulário</div>
+      </div>
+
+      <form id="cashbackForm" class="form">
+        <div class="row">
+          <label class="field">
+            <span>Nick da Twitch</span>
+            <input id="twitchName" name="twitchName" type="text" placeholder="Ex: SeuNick" autocomplete="off" required>
+          </label>
+
+          <label class="field">
+            <span>Tipo de PIX</span>
+            <select id="pixType" name="pixType">
+              <option value="random">Chave aleatória</option>
+              <option value="cpf">CPF</option>
+              <option value="email">E-mail</option>
+              <option value="phone">Telefone</option>
+            </select>
+          </label>
+        </div>
+
+        <label class="field">
+          <span>Chave PIX</span>
+          <input id="pixKey" name="pixKey" type="text" placeholder="Sua chave Pix" autocomplete="off" required>
+        </label>
+
+        <div class="upload">
+          <div class="uploadLeft">
+            <div class="uploadTitle">Print do comprovante</div>
+            <div class="uploadSub">PNG, JPG ou WEBP (até ~4,5MB)</div>
+            <input id="screenshot" name="screenshot" type="file" accept="image/png,image/jpeg,image/webp" class="file">
+            <button type="button" class="btn ghost" id="pickBtn">Selecionar imagem</button>
+          </div>
+
+          <div class="preview" id="previewBox">
+            <div class="previewEmpty" id="previewEmpty">
+              <div class="spark"></div>
+              <div class="previewText">Prévia</div>
+            </div>
+            <img id="previewImg" alt="" />
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="btn" id="sendBtn" type="submit">
+            <span class="btnText">Enviar</span>
+            <span class="btnGlow"></span>
+          </button>
+          <div class="hint">
+            Depois, use <strong>!status</strong> no chat ou consulte aqui embaixo.
+          </div>
+        </div>
+
+        <div class="result" id="submitResult" aria-live="polite"></div>
+      </form>
+    </section>
+
+    <section class="card">
+      <div class="cardHead">
+        <h2>Consultar status</h2>
+        <div class="badge" id="statusBadge">Aguardando</div>
+      </div>
+
+      <div class="statusBox">
+        <label class="field">
+          <span>Nick da Twitch</span>
+          <input id="statusUser" type="text" placeholder="Ex: SeuNick" autocomplete="off">
+        </label>
+
+        <button class="btn ghost" id="checkBtn" type="button">Consultar</button>
+
+        <div class="statusResult" id="statusResult"></div>
+      </div>
+    </section>
+
+    <section class="card wide">
+      <div class="cardHead">
+        <h2>Ranking (Aprovados)</h2>
+        <div class="badge soft" id="rankBadge">Top</div>
+      </div>
+
+      <div class="rankWrap">
+        <div class="rankList" id="rankList"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <div class="footInner">
+      <div class="muted">Se a página não carregar, confira se o link tem <strong>?key=</strong>.</div>
+      <div class="muted">Status: <span id="apiStatus">—</span></div>
+    </div>
+  </footer>
+
+  <script src="/cashback.js"></script>
+</body>
+</html>
