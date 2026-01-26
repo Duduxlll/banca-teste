@@ -1,180 +1,378 @@
-/* assets/css/cashback.css */
-
-/* Cabeçalho */
-.cb-head{
-  display:flex;
-  justify-content:space-between;
-  align-items:flex-start;
-  gap:12px;
-  flex-wrap:wrap;
+#tab-cashbacks {
+  width: 100%;
+  overscroll-behavior: auto;
 }
 
-.cb-actions{
-  display:flex;
-  gap:8px;
-  align-items:center;
-  flex-wrap:wrap;
+#tab-cashbacks * {
+  overscroll-behavior: auto;
 }
 
-.cb-actions .input{
-  min-width: 180px;
+#tab-cashbacks .card {
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,.10);
+  background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+  box-shadow: 0 20px 70px rgba(0,0,0,.55);
+  overflow: visible;
 }
 
-.cb-stats{
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-  margin-top:12px;
+.cb-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
-.cb-pill{
-  padding:8px 10px;
-  border-radius:999px;
-  background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.03));
-  border:1px solid rgba(255,255,255,.12);
-  color:#e7e9f3;
-  font-size:.9rem;
+.cb-head h2 {
+  margin: 0;
+  font-weight: 900;
+  letter-spacing: .2px;
 }
 
-.cb-actions-row{
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-  align-items:center;
-  justify-content:flex-end;
+.cb-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
-.cb-mini{
-  padding:8px 10px !important;
-  font-size:.85rem !important;
+.cb-actions .input {
+  min-width: 220px;
+  height: 42px;
+  border-radius: 12px;
 }
 
-/* Badge status */
-.cb-badge{
-  display:inline-flex;
-  align-items:center;
-  gap:6px;
-  padding:6px 10px;
-  border-radius:999px;
-  border:1px solid rgba(255,255,255,.14);
-  background:rgba(255,255,255,.06);
-  color:#e7e9f3;
-  font-weight:800;
-  font-size:.82rem;
-  letter-spacing:.2px;
+#tab-cashbacks .input,
+#tab-cashbacks select.input,
+#tab-cashbacks textarea.input {
+  background: rgba(0,0,0,.18);
+  border: 1px solid rgba(255,255,255,.14);
+  color: #e9ecf6;
+  outline: none;
 }
 
-.cb-badge--pend{
-  background:rgba(255, 214, 102, .10);
-  border-color:rgba(255, 214, 102, .25);
+#tab-cashbacks .input::placeholder {
+  color: rgba(233,236,246,.55);
 }
 
-.cb-badge--ok{
-  background:rgba(76, 217, 100, .10);
-  border-color:rgba(76, 217, 100, .25);
+#tab-cashbacks .input:focus,
+#tab-cashbacks select.input:focus,
+#tab-cashbacks textarea.input:focus {
+  border-color: rgba(65, 245, 160, .45);
+  box-shadow: 0 0 0 3px rgba(65, 245, 160, .12);
 }
 
-.cb-badge--no{
-  background:rgba(255, 69, 58, .10);
-  border-color:rgba(255, 69, 58, .25);
+.cb-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
 }
 
-/* PIX cell */
-.cb-pix{
-  display:flex;
-  flex-direction:column;
-  gap:2px;
+.cb-pill {
+  padding: 10px 12px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255,255,255,.09), rgba(255,255,255,.04));
+  border: 1px solid rgba(255,255,255,.12);
+  color: #f1f4ff;
+  font-size: .92rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
 }
 
-.cb-pix-key{
-  font-weight:800;
-  color:#fff;
+.cb-pill strong {
+  font-weight: 900;
+  color: #ffffff;
 }
 
-.cb-pix-type{
-  font-size:.8rem;
-  opacity:.75;
+.cb-actions-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
 }
 
-/* Ranking header */
-.cb-rank-head{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap:10px;
-  flex-wrap:wrap;
-  margin-bottom:10px;
+.cb-mini {
+  padding: 8px 10px !important;
+  font-size: .86rem !important;
+  border-radius: 12px !important;
 }
 
-/* Modal */
-dialog.cb-modal{
-  border:0;
-  padding:0;
-  background:transparent;
+#tab-cashbacks .btn {
+  border-radius: 12px;
 }
 
-dialog.cb-modal::backdrop{
-  background: rgba(8,12,26,.65);
-  backdrop-filter: blur(6px) saturate(.9);
+#tab-cashbacks .btn:hover {
+  filter: brightness(1.06);
 }
 
-.cb-modal-card{
-  width:min(96vw,560px);
-  color:#e7e9f3;
-  background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
-  border:1px solid rgba(255,255,255,.16);
-  border-radius:16px;
-  box-shadow:0 30px 90px rgba(0,0,0,.70);
-  padding:16px;
+#tab-cashbacks .btn:active {
+  transform: translateY(1px);
 }
 
-.cb-modal-head{
-  display:flex;
-  justify-content:space-between;
-  align-items:flex-start;
-  gap:10px;
+#tab-cashbacks .btn.btn--ghost,
+#tab-cashbacks .btn.ghost {
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.14);
 }
 
-.cb-modal-title{
-  margin:0;
-  font-weight:900;
-  letter-spacing:.2px;
+#tab-cashbacks .btn.btn--ghost:hover,
+#tab-cashbacks .btn.ghost:hover {
+  background: rgba(255,255,255,.09);
 }
 
-.cb-modal-sub{
-  margin:4px 0 0;
-  color:rgba(231,233,243,.75);
-  font-size:.9rem;
+#tab-cashbacks .btn.btn--primary {
+  background: linear-gradient(180deg, rgba(65,245,160,.95), rgba(20,200,120,.85));
+  border: 1px solid rgba(65,245,160,.35);
+  color: #062012;
+  font-weight: 900;
 }
 
-.cb-x{
-  border:0;
-  background:transparent;
-  color:#fff;
-  font-size:22px;
-  line-height:1;
-  cursor:pointer;
-  padding:4px 6px;
+#tab-cashbacks .btn.btn--danger {
+  background: linear-gradient(180deg, rgba(255,90,90,.95), rgba(220,45,45,.85));
+  border: 1px solid rgba(255,90,90,.35);
+  color: #2a0606;
+  font-weight: 900;
 }
 
-.cb-modal-body{
-  margin-top:12px;
+.cb-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.16);
+  background: rgba(255,255,255,.07);
+  color: #f2f4ff;
+  font-weight: 900;
+  font-size: .84rem;
+  letter-spacing: .2px;
+  white-space: nowrap;
 }
 
-.cb-grid{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:10px;
+.cb-badge--pend {
+  background: rgba(255, 214, 102, .16);
+  border-color: rgba(255, 214, 102, .38);
+  color: #fff3c4;
 }
 
-.cb-modal-actions{
-  display:flex;
-  justify-content:flex-end;
-  gap:8px;
-  margin-top:12px;
+.cb-badge--ok {
+  background: rgba(65, 245, 160, .14);
+  border-color: rgba(65, 245, 160, .36);
+  color: #d9ffe9;
 }
 
-@media (max-width: 640px){
-  .cb-grid{ grid-template-columns: 1fr; }
-  .cb-actions .input{ min-width: 140px; }
+.cb-badge--no {
+  background: rgba(255, 90, 90, .14);
+  border-color: rgba(255, 90, 90, .36);
+  color: #ffe0e0;
+}
+
+.cb-pix {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.cb-pix-key {
+  font-weight: 900;
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+}
+
+.cb-pix-type {
+  font-size: .82rem;
+  opacity: .78;
+}
+
+#tab-cashbacks .table-wrap {
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+  border-radius: 16px;
+}
+
+#tab-cashbacks .table-wrap::-webkit-scrollbar {
+  height: 10px;
+}
+
+#tab-cashbacks .table-wrap::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,.16);
+  border-radius: 999px;
+}
+
+#tab-cashbacks .table-wrap::-webkit-scrollbar-track {
+  background: rgba(0,0,0,.18);
+  border-radius: 999px;
+}
+
+#tab-cashbacks table.table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+#tab-cashbacks table.table thead th {
+  text-align: left;
+  font-weight: 900;
+  color: rgba(233,236,246,.92);
+  padding: 14px 12px;
+  border-bottom: 1px solid rgba(255,255,255,.10);
+  background: rgba(0,0,0,.10);
+}
+
+#tab-cashbacks table.table tbody td {
+  padding: 14px 12px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+  color: rgba(233,236,246,.92);
+  vertical-align: middle;
+}
+
+#tab-cashbacks table.table tbody tr:hover td {
+  background: rgba(255,255,255,.04);
+}
+
+#tab-cashbacks .col-acoes {
+  width: 280px;
+}
+
+.cb-rank-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+dialog.cb-modal {
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+
+dialog.cb-modal::backdrop {
+  background: rgba(8, 12, 26, .70);
+  backdrop-filter: blur(8px) saturate(.95);
+}
+
+.cb-modal-card {
+  width: min(96vw, 580px);
+  color: #eef1ff;
+  background: linear-gradient(180deg, rgba(16, 20, 34, .92), rgba(10, 12, 22, .90));
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 18px;
+  box-shadow: 0 30px 100px rgba(0,0,0,.75);
+  padding: 16px;
+}
+
+.cb-modal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.cb-modal-title {
+  margin: 0;
+  font-weight: 950;
+  letter-spacing: .2px;
+}
+
+.cb-modal-sub {
+  margin: 6px 0 0;
+  color: rgba(238,241,255,.72);
+  font-size: .92rem;
+}
+
+.cb-x {
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.06);
+  color: #fff;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 12px;
+}
+
+.cb-x:hover {
+  background: rgba(255,255,255,.10);
+}
+
+.cb-modal-body {
+  margin-top: 12px;
+}
+
+.cb-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.cb-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+#tab-cashbacks .toast,
+#tab-cashbacks #toast,
+.toast {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 99999;
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: linear-gradient(180deg, rgba(16,20,34,.92), rgba(10,12,22,.92));
+  box-shadow: 0 24px 70px rgba(0,0,0,.70);
+  color: #f2f4ff;
+  opacity: 0;
+  transform: translateY(-10px);
+  pointer-events: none;
+  transition: opacity .18s ease, transform .18s ease;
+}
+
+#tab-cashbacks .toast.show,
+#tab-cashbacks #toast.show,
+.toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (max-width: 900px) {
+  .cb-actions .input {
+    min-width: 180px;
+  }
+  #tab-cashbacks .col-acoes {
+    width: 240px;
+  }
+}
+
+@media (max-width: 640px) {
+  .cb-grid {
+    grid-template-columns: 1fr;
+  }
+  .cb-actions {
+    width: 100%;
+  }
+  .cb-actions .input {
+    width: 100%;
+    min-width: 0;
+  }
+  .cb-stats {
+    grid-template-columns: 1fr;
+  }
+  #tab-cashbacks .col-acoes {
+    width: auto;
+  }
 }
