@@ -227,34 +227,52 @@ function notify(msg, type='ok'){
   }
 
   let proofDlg = null;
-  function ensureProofModal() {
-    if (proofDlg) return proofDlg;
+function ensureProofModal() {
+  if (proofDlg) return proofDlg;
 
-    const dlg = document.createElement('dialog');
-    dlg.className = 'cb-modal';
-    dlg.innerHTML = `
-      <div class="cb-modal-card">
-        <div class="cb-modal-head" style="display:flex;justify-content:space-between;gap:10px;align-items:center">
-          <div>
-            <div style="font-weight:800">Comprovante</div>
-            <div class="muted" id="cbPSub">—</div>
-          </div>
-          <button type="button" class="btn ghost" data-close>Fechar</button>
+  const dlg = document.createElement('dialog');
+  dlg.className = 'cb-modal cb-proof';
+  dlg.innerHTML = `
+    <div class="cb-modal-card">
+      <div class="cb-modal-head" style="display:flex;justify-content:space-between;gap:10px;align-items:center">
+        <div>
+          <div style="font-weight:800">Comprovante</div>
+          <div class="muted" id="cbPSub">—</div>
         </div>
-        <div style="margin-top:12px">
-          <img id="cbPImg" alt="" style="max-width:100%;border-radius:14px;display:block">
-        </div>
+
+        <!-- X no canto -->
+        <button type="button" class="cb-x" data-close aria-label="Fechar">×</button>
       </div>
-    `;
-    document.body.appendChild(dlg);
 
-    dlg.addEventListener('click', (e) => {
-      if (e.target === dlg || e.target.closest('[data-close]')) dlg.close();
-    });
+      <div class="cb-proof-body" style="margin-top:12px">
+        <img id="cbPImg" alt="" />
+      </div>
 
-    proofDlg = dlg;
-    return dlg;
-  }
+      <div class="muted cb-proof-hint">Clique na imagem para dar zoom.</div>
+    </div>
+  `;
+  document.body.appendChild(dlg);
+
+  
+  dlg.addEventListener('click', (e) => {
+    if (e.target === dlg || e.target.closest('[data-close]')) dlg.close();
+  });
+
+  
+  const img = dlg.querySelector('#cbPImg');
+  img.addEventListener('click', () => {
+    dlg.classList.toggle('is-zoom');
+  });
+
+  
+  dlg.addEventListener('close', () => {
+    dlg.classList.remove('is-zoom');
+  });
+
+  proofDlg = dlg;
+  return dlg;
+}
+
 
   const STATE = {
     list: [],
@@ -427,6 +445,8 @@ function notify(msg, type='ok'){
 
   async function openProof(id) {
     const dlg = ensureProofModal();
+    dlg.classList.remove('is-zoom');
+
     try {
       const data = await apiFetch(`/api/cashback/admin/${encodeURIComponent(id)}`, { method: 'GET' });
       const row = data?.row;
