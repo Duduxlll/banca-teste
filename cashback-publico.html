@@ -23,21 +23,19 @@
       <div class="logo">CB</div>
       <div class="brandText">
         <div class="brandTitle">Cashback</div>
-        <div class="brandSub">Envie seu pedido e acompanhe o status</div>
+        <div class="brandSub">Envie seu pedido</div>
       </div>
     </div>
-
-    <div class="chip" id="keyChip">Chave pública: carregando…</div>
   </header>
 
-  <main class="grid">
+  <main class="grid" style="max-width:980px;margin:0 auto">
     <section class="card">
       <div class="cardHead">
         <h2>Solicitar cashback</h2>
         <div class="badge live" id="submitBadge">Formulário</div>
       </div>
 
-      <form id="cashbackForm" class="form">
+      <form id="cashbackForm" class="form" novalidate>
         <div class="row">
           <label class="field">
             <span>Nick da Twitch</span>
@@ -46,7 +44,7 @@
 
           <label class="field">
             <span>Tipo de PIX</span>
-            <select id="pixType" name="pixType">
+            <select id="pixType" name="pixType" required>
               <option value="random">Chave aleatória</option>
               <option value="cpf">CPF</option>
               <option value="email">E-mail</option>
@@ -64,7 +62,7 @@
           <div class="uploadLeft">
             <div class="uploadTitle">Print do comprovante</div>
             <div class="uploadSub">PNG, JPG ou WEBP (até ~4,5MB)</div>
-            <input id="screenshot" name="screenshot" type="file" accept="image/png,image/jpeg,image/webp" class="file">
+            <input id="screenshot" name="screenshot" type="file" accept="image/png,image/jpeg,image/webp" class="file" required>
             <button type="button" class="btn ghost" id="pickBtn">Selecionar imagem</button>
           </div>
 
@@ -73,7 +71,7 @@
               <div class="spark"></div>
               <div class="previewText">Prévia</div>
             </div>
-            <img id="previewImg" alt="" />
+            <img id="previewImg" alt="">
           </div>
         </div>
 
@@ -83,49 +81,14 @@
             <span class="btnGlow"></span>
           </button>
           <div class="hint">
-            Depois, use <strong>!status</strong> no chat ou consulte aqui embaixo.
+            Depois, acompanhe pelo chat usando <strong>!status</strong>.
           </div>
         </div>
 
         <div class="result" id="submitResult" aria-live="polite"></div>
       </form>
     </section>
-
-    <section class="card">
-      <div class="cardHead">
-        <h2>Consultar status</h2>
-        <div class="badge" id="statusBadge">Aguardando</div>
-      </div>
-
-      <div class="statusBox">
-        <label class="field">
-          <span>Nick da Twitch</span>
-          <input id="statusUser" type="text" placeholder="Ex: SeuNick" autocomplete="off">
-        </label>
-
-        <button class="btn ghost" id="checkBtn" type="button">Consultar</button>
-
-        <div class="statusResult" id="statusResult"></div>
-      </div>
-    </section>
-
-    <section class="card wide">
-      <div class="cardHead">
-        <h2>Ranking (Aprovados)</h2>
-        <div class="badge soft" id="rankBadge">Top</div>
-      </div>
-
-      <div class="rankWrap">
-        <div class="rankList" id="rankList"></div>
-      </div>
-    </section>
   </main>
-
-  <footer class="foot">
-    <div class="footInner">
-      <div class="muted">Status: <span id="apiStatus">—</span></div>
-    </div>
-  </footer>
 
   <script src="assets/js/cashback-publico.js"></script>
 </body>

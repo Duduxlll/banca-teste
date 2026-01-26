@@ -12,25 +12,12 @@ const submitResult = qs('#submitResult');
 const sendBtn = qs('#sendBtn');
 const submitBadge = qs('#submitBadge');
 
-const statusUser = qs('#statusUser');
-const checkBtn = qs('#checkBtn');
-const statusResult = qs('#statusResult');
-const statusBadge = qs('#statusBadge');
-
-const rankList = qs('#rankList');
-const apiStatus = qs('#apiStatus');
-const keyChip = qs('#keyChip');
-
 function getMeta(name) {
   const el = document.querySelector(`meta[name="${name}"]`);
   return el ? el.content : '';
 }
 
-const key = (window.APP_PUBLIC_KEY || getMeta('app-key') || '').trim();
-
-function setApiStatus(text) {
-  apiStatus.textContent = text;
-}
+const APP_KEY = window.APP_PUBLIC_KEY || getMeta('app-key') || '';
 
 function esc(s) {
   return String(s || '').replace(/[&<>"']/g, m => ({
@@ -42,35 +29,63 @@ function esc(s) {
   }[m]));
 }
 
-function pill(status) {
-  const s = String(status || '').toUpperCase();
-  if (s === 'APROVADO') return `<span class="pill good"><span class="dot"></span>APROVADO</span>`;
-  if (s === 'REPROVADO') return `<span class="pill bad"><span class="dot"></span>REPROVADO</span>`;
-  return `<span class="pill warn"><span class="dot"></span>PENDENTE</span>`;
-}
-
 function setBadge(el, text, cls) {
+  if (!el) return;
   el.textContent = text;
   el.classList.remove('live', 'soft');
   if (cls) el.classList.add(cls);
 }
 
-function formatDate(v) {
-  if (!v) return '—';
-  const d = new Date(v);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleString('pt-BR');
+function digits(v) {
+  return String(v || '').replace(/\D/g, '');
+}
+
+function maskCPF(raw) {
+  let v = digits(raw).slice(0, 11);
+  v = v.replace(/(\d{3})(\d)/, '$1.$2')
+       .replace(/(\d{3})(\d)/, '$1.$2')
+       .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+  return v;
+}
+
+function isCPFValid(cpf) {
+  cpf = digits(cpf);
+  if (cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) return false;
+
+  let s = 0;
+  for (let i = 1; i <= 9; i++) s += parseInt(cpf.substring(i - 1, i), 10) * (11 - i);
+  let r = (s * 10) % 11;
+  if (r === 10 || r === 11) r = 0;
+  if (r !== parseInt(cpf.substring(9, 10), 10)) return false;
+
+  s = 0;
+  for (let i = 1; i <= 10; i++) s += parseInt(cpf.substring(i - 1, i), 10) * (12 - i);
+  r = (s * 10) % 11;
+  if (r === 10 || r === 11) r = 0;
+  return r === parseInt(cpf.substring(10, 11), 10);
+}
+
+function maskPhone(raw) {
+  let v = digits(raw).slice(0, 11);
+  if (v.length > 2) v = `(${v.slice(0, 2)}) ${v.slice(2)}`;
+  if (v.length > 10) v = `${v.slice(0, 10)}-${v.slice(10)}`;
+  return v;
+}
+
+function isEmail(v) {
+  return /.+@.+\..+/.test(String(v || '').trim());
 }
 
 async function apiFetch(url, opts = {}) {
-  if (!key) throw new Error('sem_app_key');
+  if (!APP_KEY) throw new Error('app_key_ausente');
 
   const headers = Object.assign({}, opts.headers || {});
-  headers['X-APP-KEY'] = key;
+  headers['X-APP-KEY'] = APP_KEY;
 
   const res = await fetch(url, { ...opts, headers });
   let data = null;
   try { data = await res.json(); } catch {}
+
   if (!res.ok) {
     const msg = data?.error || `http_${res.status}`;
     throw new Error(msg);
@@ -80,9 +95,67 @@ async function apiFetch(url, opts = {}) {
 
 let screenshotDataUrl = null;
 
-pickBtn.addEventListener('click', () => screenshot.click());
+function setPixPlaceholder() {
+  const t = String(pixType?.value || 'random');
+  if (!pixKey) return;
 
-screenshot.addEventListener('change', async () => {
+  if (t === 'cpf') pixKey.placeholder = '000.000.000-00';
+  else if (t === 'phone') pixKey.placeholder = '(00) 90000-0000';
+  else if (t === 'email') pixKey.placeholder = 'seu@email.com';
+  else pixKey.placeholder = 'Ex.: 2e1a-...';
+}
+
+function normalizePixKeyForSend() {
+  const t = String(pixType?.value || 'random');
+  const v = String(pixKey?.value || '').trim();
+
+  if (t === 'cpf') return digits(v);
+  if (t === 'phone') return digits(v).slice(-11);
+  return v;
+}
+
+function validatePixKey() {
+  const t = String(pixType?.value || 'random');
+  const v = String(pixKey?.value || '').trim();
+
+  if (!v) return { ok: false, msg: 'Chave Pix é obrigatória.' };
+
+  if (t === 'cpf') {
+    if (!isCPFValid(v)) return { ok: false, msg: 'CPF inválido.' };
+    return { ok: true };
+  }
+
+  if (t === 'email') {
+    if (!isEmail(v)) return { ok: false, msg: 'E-mail inválido.' };
+    return { ok: true };
+  }
+
+  if (t === 'phone') {
+    const d = digits(v);
+    if (d.length !== 11) return { ok: false, msg: 'Telefone inválido (11 dígitos).' };
+    return { ok: true };
+  }
+
+  if (String(v).length < 10) return { ok: false, msg: 'Chave aleatória inválida.' };
+  return { ok: true };
+}
+
+pickBtn?.addEventListener('click', () => screenshot?.click());
+
+pixType?.addEventListener('change', () => {
+  setPixPlaceholder();
+  const t = String(pixType.value || 'random');
+  if (t === 'cpf') pixKey.value = maskCPF(pixKey.value);
+  if (t === 'phone') pixKey.value = maskPhone(pixKey.value);
+});
+
+pixKey?.addEventListener('input', () => {
+  const t = String(pixType?.value || 'random');
+  if (t === 'cpf') pixKey.value = maskCPF(pixKey.value);
+  if (t === 'phone') pixKey.value = maskPhone(pixKey.value);
+});
+
+screenshot?.addEventListener('change', async () => {
   const file = screenshot.files?.[0] || null;
   screenshotDataUrl = null;
 
@@ -121,18 +194,23 @@ screenshot.addEventListener('change', async () => {
   previewEmpty.style.display = 'none';
 });
 
-form.addEventListener('submit', async (ev) => {
+form?.addEventListener('submit', async (ev) => {
   ev.preventDefault();
 
-  const body = {
-    twitchName: twitchName.value.trim(),
-    pixType: pixType.value,
-    pixKey: pixKey.value.trim(),
-    screenshotDataUrl: screenshotDataUrl
-  };
+  const nick = String(twitchName?.value || '').trim();
+  if (!nick) {
+    submitResult.innerHTML = `<div class="msgTitle">Preencha os campos</div><div class="msgLine">Nick da Twitch é obrigatório.</div>`;
+    return;
+  }
 
-  if (!body.twitchName || !body.pixKey) {
-    submitResult.innerHTML = `<div class="msgTitle">Preencha os campos</div><div class="msgLine">Nick da Twitch e chave Pix são obrigatórios.</div>`;
+  const pixCheck = validatePixKey();
+  if (!pixCheck.ok) {
+    submitResult.innerHTML = `<div class="msgTitle">Verifique a chave</div><div class="msgLine">${esc(pixCheck.msg || 'Chave inválida.')}</div>`;
+    return;
+  }
+
+  if (!screenshotDataUrl) {
+    submitResult.innerHTML = `<div class="msgTitle">Falta o print</div><div class="msgLine">Selecione a imagem do comprovante para enviar.</div>`;
     return;
   }
 
@@ -141,6 +219,13 @@ form.addEventListener('submit', async (ev) => {
   submitResult.innerHTML = `<div class="msgTitle">Enviando…</div><div class="msgLine">Aguarde só um instante.</div>`;
 
   try {
+    const body = {
+      twitchName: nick,
+      pixType: pixType?.value || 'random',
+      pixKey: normalizePixKeyForSend(),
+      screenshotDataUrl
+    };
+
     const data = await apiFetch('/api/cashback/submit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -151,19 +236,24 @@ form.addEventListener('submit', async (ev) => {
     submitResult.innerHTML =
       `<div class="msgTitle">Pedido enviado ✅</div>
        <div class="msgLine">Protocolo: <strong>${esc(data.id)}</strong></div>
-       <div class="msgLine">Use <strong>!status</strong> no chat ou consulte abaixo com seu nick.</div>`;
+       <div class="msgLine">Acompanhe pelo chat com <strong>!status</strong>.</div>`;
 
-    statusUser.value = twitchName.value.trim();
-    await checkStatus(statusUser.value.trim());
+    form.reset();
+    screenshotDataUrl = null;
+    previewImg.style.display = 'none';
+    previewEmpty.style.display = 'grid';
+    setPixPlaceholder();
   } catch (e) {
     setBadge(submitBadge, 'Falhou', '');
     const msg = String(e.message || 'erro');
     let nice = msg;
 
-    if (msg === 'sem_app_key') nice = 'Falta app-key no HTML (meta[name="app-key"]).';
     if (msg === 'screenshot_grande') nice = 'Imagem grande demais.';
     if (msg === 'screenshot_invalida') nice = 'Screenshot inválida.';
+    if (msg === 'screenshot_obrigatoria') nice = 'O print é obrigatório.';
     if (msg === 'dados_invalidos') nice = 'Dados inválidos. Verifique os campos.';
+    if (msg === 'pix_invalido') nice = 'Chave Pix inválida.';
+    if (msg === 'app_key_ausente') nice = 'Página sem chave pública configurada.';
     if (msg.startsWith('http_413')) nice = 'Imagem grande demais.';
 
     submitResult.innerHTML =
@@ -175,86 +265,7 @@ form.addEventListener('submit', async (ev) => {
   }
 });
 
-async function checkStatus(user) {
-  const u = String(user || '').trim();
-  if (!u) {
-    statusResult.innerHTML = `<div class="msgLine">Digite seu nick da Twitch.</div>`;
-    setBadge(statusBadge, 'Aguardando', '');
-    return;
-  }
-
-  checkBtn.disabled = true;
-  setBadge(statusBadge, 'Consultando…', 'soft');
-  statusResult.innerHTML = `<div class="msgLine">Buscando seu status…</div>`;
-
-  try {
-    const st = await apiFetch(`/api/cashback/status/${encodeURIComponent(u)}`, { method: 'GET' });
-
-    const html =
-      `<div>${pill(st.status)}</div>
-       <div class="kv">
-         <div class="kvRow"><span>Nick</span><strong>${esc(st.twitchName || u)}</strong></div>
-         <div class="kvRow"><span>Atualizado</span><strong>${esc(formatDate(st.updatedAt))}</strong></div>
-         <div class="kvRow"><span>Prazo</span><strong>${esc(st.payoutWindow || '—')}</strong></div>
-         <div class="kvRow"><span>Motivo</span><strong>${esc(st.reason || '—')}</strong></div>
-       </div>`;
-
-    statusResult.innerHTML = html;
-
-    const s = String(st.status || '').toUpperCase();
-    if (s === 'APROVADO') setBadge(statusBadge, 'Aprovado', 'live');
-    else if (s === 'REPROVADO') setBadge(statusBadge, 'Reprovado', '');
-    else setBadge(statusBadge, 'Pendente', 'soft');
-  } catch (e) {
-    const msg = String(e.message || '');
-    if (msg === 'not_found') {
-      statusResult.innerHTML = `<div class="msgLine">Nenhum pedido encontrado pra <strong>${esc(u)}</strong>.</div>`;
-      setBadge(statusBadge, 'Sem registro', '');
-    } else {
-      statusResult.innerHTML = `<div class="msgLine">Erro ao consultar.</div>`;
-      setBadge(statusBadge, 'Falha', '');
-    }
-  } finally {
-    checkBtn.disabled = false;
-  }
+setPixPlaceholder();
+if (!APP_KEY) {
+  submitResult.innerHTML = `<div class="msgTitle">Configuração</div><div class="msgLine">Falta a chave pública no HTML (meta app-key).</div>`;
 }
-
-checkBtn.addEventListener('click', () => checkStatus(statusUser.value));
-statusUser.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') checkStatus(statusUser.value);
-});
-
-async function loadRanking() {
-  try {
-    const data = await apiFetch('/api/cashback/ranking?limit=10', { method: 'GET' });
-    const rows = data?.rows || [];
-
-    if (!rows.length) {
-      rankList.innerHTML = `<div class="muted">Ainda não há aprovados.</div>`;
-      return;
-    }
-
-    rankList.innerHTML = rows.map((r, idx) => {
-      const pos = idx + 1;
-      return `
-        <div class="rankItem" style="animation-delay:${Math.min(idx * 0.04, 0.3)}s">
-          <div class="rankLeft">
-            <div class="rankPos">${pos}</div>
-            <div class="rankName">${esc(r.user || '')}</div>
-          </div>
-          <div class="rankRight">${esc(String(r.approved || 0))}</div>
-        </div>
-      `;
-    }).join('');
-  } catch {
-    rankList.innerHTML = `<div class="muted">Não foi possível carregar o ranking.</div>`;
-  }
-}
-
-function init() {
-  keyChip.textContent = key ? `Chave pública: ${key.slice(0, 6)}…${key.slice(-4)}` : 'Chave pública: ausente';
-  setApiStatus('ok');
-  loadRanking();
-}
-
-init();

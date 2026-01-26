@@ -6,9 +6,9 @@ export function initTwitchBot({
   botUsername,
   oauthToken,
   channel,
-  cashbackUrl = "",
   enabled = true,
   onLog = console,
+  cashbackPublicUrl
 }) {
   const log = onLog || console;
 
@@ -25,6 +25,11 @@ export function initTwitchBot({
   const tmi = tmiPkg?.default ?? tmiPkg;
   const chan = channel.startsWith("#") ? channel : `#${channel}`;
   const pass = oauthToken.startsWith("oauth:") ? oauthToken : `oauth:${oauthToken}`;
+
+  const publicUrl =
+    cashbackPublicUrl ||
+    process.env.CASHBACK_PUBLIC_URL ||
+    "https://banca-teste.onrender.com/cashback-publico.html";
 
   const client = new tmi.Client({
     options: { debug: false },
@@ -43,10 +48,11 @@ export function initTwitchBot({
     if (!text.startsWith("!")) return null;
 
     let m = text.match(/^!palpite\b\s*(.+)$/i) || text.match(/^!p\b\s*(.+)$/i);
-    if (m && m[1]) return { cmd: "palpite", arg: m[1].trim() };
+    if (m && m[1]) return { type: "guess", payload: m[1].trim() };
 
-    if (/^!cashback\b/i.test(text)) return { cmd: "cashback" };
-    if (/^!status\b/i.test(text)) return { cmd: "status" };
+    if (/^!cashback\b/i.test(text)) return { type: "cashback" };
+
+    if (/^!status\b/i.test(text)) return { type: "status" };
 
     return null;
   }
@@ -64,30 +70,15 @@ export function initTwitchBot({
   }
 
   async function getCashbackStatus(user) {
-    const url = `http://127.0.0.1:${port}/api/cashback/status/${encodeURIComponent(user)}`;
+    const url = `http://127.0.0.1:${port}/api/cashback/status/${encodeURIComponent(user)}?key=${encodeURIComponent(apiKey)}`;
+    const res = await fetch(url, { method: "GET", headers: { Accept: "application/json" } });
 
-    const res = await fetch(url, {
-      method: "GET",
-      headers: { Accept: "application/json", "X-APP-KEY": apiKey },
-    });
-
+    if (res.status === 404) return { notFound: true };
     let data = null;
     try { data = await res.json(); } catch {}
+    if (!res.ok) return { error: data?.error || `http_${res.status}` };
 
-    if (!res.ok) {
-      const msg = data?.error || `http_${res.status}`;
-      throw new Error(msg);
-    }
-    return data;
-  }
-
-  const statusCooldown = new Map();
-  function canCheckStatus(user) {
-    const now = Date.now();
-    const last = statusCooldown.get(user) || 0;
-    if (now - last < 8000) return false;
-    statusCooldown.set(user, now);
-    return true;
+    return { ok: true, data };
   }
 
   client.on("connected", () => {
@@ -97,50 +88,46 @@ export function initTwitchBot({
   client.on("message", (channelName, tags, message, self) => {
     if (self) return;
 
-    const user = (tags.username || tags["display-name"] || "").trim();
+    const userTag = (tags.username || "").trim();
+    const display = (tags["display-name"] || tags.username || "").trim();
+    const user = display || userTag;
     if (!user) return;
 
     const cmd = parseCommand(message);
     if (!cmd) return;
 
     enqueue(async () => {
-      if (cmd.cmd === "palpite") {
-        await submitGuessToServer(user, cmd.arg);
+      if (cmd.type === "guess") {
+        await submitGuessToServer(user, cmd.payload);
         return;
       }
 
-      if (cmd.cmd === "cashback") {
-        const link = String(cashbackUrl || "").trim();
-        if (!link) {
-          await client.say(chan, `@${user} cashback: link não configurado no bot.`);
-        } else {
-          await client.say(chan, `@${user} para pedir cashback: ${link}`);
+      if (cmd.type === "cashback") {
+        await say(`Cashback: envie aqui 👉 ${publicUrl}`);
+        return;
+      }
+
+      if (cmd.type === "status") {
+        const st = await getCashbackStatus(userTag || user);
+        if (st.notFound) {
+          await say(`@${userTag || user} você ainda não tem pedido. Use !cashback`);
+          return;
         }
-        return;
-      }
+        if (st.error) {
+          await say(`@${userTag || user} não consegui consultar agora. Tenta de novo já já.`);
+          return;
+        }
 
-      if (cmd.cmd === "status") {
-        if (!canCheckStatus(user)) return;
+        const s = String(st.data?.status || "").toUpperCase();
+        const reason = String(st.data?.reason || "").trim();
+        const prazo = String(st.data?.payoutWindow || "").trim();
 
-        try {
-          const st = await getCashbackStatus(user);
-          const s = String(st.status || "PENDENTE").toUpperCase();
-          const prazo = st.payoutWindow ? ` | prazo: ${st.payoutWindow}` : "";
-          const motivo = st.reason ? ` | motivo: ${st.reason}` : "";
-
-          if (s === "APROVADO") {
-            await client.say(chan, `@${user} seu cashback está APROVADO ✅${prazo}`);
-          } else if (s === "REPROVADO") {
-            await client.say(chan, `@${user} seu cashback foi REPROVADO ❌${motivo}`);
-          } else {
-            await client.say(chan, `@${user} seu cashback está PENDENTE ⏳`);
-          }
-        } catch (e) {
-          if (String(e.message) === "not_found") {
-            await client.say(chan, `@${user} não achei nenhum cashback seu ainda. Use !cashback pra enviar.`);
-          } else {
-            await client.say(chan, `@${user} não consegui consultar agora. Tenta de novo jájá.`);
-          }
+        if (s === "APROVADO") {
+          await say(`@${userTag || user} APROVADO ✅ ${prazo ? `• ${prazo}` : ""}`.trim());
+        } else if (s === "REPROVADO") {
+          await say(`@${userTag || user} REPROVADO ❌ ${reason ? `• ${reason}` : ""}`.trim());
+        } else {
+          await say(`@${userTag || user} PENDENTE ⏳ Aguarde a análise.`);
         }
         return;
       }

@@ -1,7 +1,7 @@
 (() => {
   const API = window.location.origin;
 
-  const qs  = (s, r=document) => r.querySelector(s);
+  const qs = (s, r = document) => r.querySelector(s);
 
   function getCookie(name) {
     const m = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([$?*|{}\\^])/g, '\\$1') + '=([^;]*)'));
@@ -14,7 +14,7 @@
     const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
     const method = (opts.method || 'GET').toUpperCase();
 
-    if (['POST','PUT','PATCH','DELETE'].includes(method)) {
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
       const csrf = getCookie('csrf');
       if (csrf) headers['X-CSRF-Token'] = csrf;
     }
@@ -28,83 +28,82 @@
     return res.status === 204 ? null : res.json();
   }
 
-  const esc = (s='') => String(s).replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
-  const fmtDT  = (d) => {
+  const esc = (s = '') => String(s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+  const fmtDT = (d) => {
     if (!d) return '—';
     const dt = new Date(d);
     if (Number.isNaN(dt.getTime())) return '—';
     return dt.toLocaleString('pt-BR');
   };
 
-  function notify(msg, type='ok') {
+  function notify(msg, type = 'ok') {
     if (typeof window.notify === 'function') return window.notify(msg, type);
     alert(msg);
   }
 
-  function debounce(fn, wait=250){
-    let t;
-    return (...args)=>{ clearTimeout(t); t=setTimeout(()=>fn(...args), wait); };
-  }
-
-  function maskPixKey(key='') {
+  function maskPixKey(key = '') {
     const k = String(key || '').trim();
     if (!k) return '—';
     if (k.length <= 10) return k;
-    return `${k.slice(0, 3)}…${k.slice(-4)}`;
+    return `${k.slice(0, 4)}…${k.slice(-4)}`;
   }
 
-  function statusMeta(status='PENDENTE'){
-    const s = String(status||'PENDENTE').toUpperCase();
-    if (s === 'APROVADO') return { label:'✅ APROVADO', cls:'cb-badge cb-badge--ok' };
-    if (s === 'REPROVADO') return { label:'❌ REPROVADO', cls:'cb-badge cb-badge--no' };
-    return { label:'⏳ PENDENTE', cls:'cb-badge cb-badge--pend' };
+  function statusBadge(status = '') {
+    const s = String(status || '').toUpperCase();
+    if (s === 'APROVADO') return `<span class="badge live">APROVADO</span>`;
+    if (s === 'REPROVADO') return `<span class="badge">REPROVADO</span>`;
+    return `<span class="badge soft">PENDENTE</span>`;
   }
 
-  function ensureBaseUI() {
+  function ensureUI() {
     const tab = qs('#tab-cashbacks');
     if (!tab) return null;
-    if (qs('#tblCashbacks', tab)) return tab;
+
+    if (qs('#cbTbl', tab)) return tab;
 
     tab.innerHTML = `
       <div class="card" style="margin-bottom:12px">
-        <div class="cb-head">
+        <div style="display:flex;gap:12px;align-items:flex-end;justify-content:space-between;flex-wrap:wrap">
           <div>
-            <h2 style="margin:0">💸 Cashbacks</h2>
-            <p class="muted" style="margin:6px 0 0">Painel de revisão: aprovar/reprovar e ver comprovante.</p>
+            <h2 style="margin:0">Cashbacks</h2>
+            <div class="muted" style="margin-top:6px">Chat: !cashback • Status: !status</div>
           </div>
 
-          <div class="cb-actions">
-            <select id="cbFilterStatus" class="input">
-              <option value="all">Todos</option>
-              <option value="PENDENTE" selected>Pendentes</option>
-              <option value="APROVADO">Aprovados</option>
-              <option value="REPROVADO">Reprovados</option>
-            </select>
-
-            <input id="cbSearch" class="input" placeholder="Buscar por nick / pix / id…">
-            <button id="cbReload" class="btn btn--ghost">Atualizar</button>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn" id="cbReload" type="button">Atualizar</button>
+            <button class="btn ghost" id="cbCopyLink" type="button">Copiar link</button>
           </div>
         </div>
 
-        <div class="cb-stats">
-          <div class="cb-pill">Pendentes: <strong id="cbCountPendente">0</strong></div>
-          <div class="cb-pill">Aprovados: <strong id="cbCountAprovado">0</strong></div>
-          <div class="cb-pill">Reprovados: <strong id="cbCountReprovado">0</strong></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;align-items:center">
+          <input id="cbSearch" class="input" placeholder="Buscar por nick...">
+          <select id="cbStatus" class="input">
+            <option value="PENDENTE" selected>Pendentes</option>
+            <option value="APROVADO">Aprovados</option>
+            <option value="REPROVADO">Reprovados</option>
+            <option value="ALL">Todos</option>
+          </select>
+
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-left:auto">
+            <div class="chip">Pendentes: <strong id="cbCountPend">0</strong></div>
+            <div class="chip">Aprovados: <strong id="cbCountApr">0</strong></div>
+            <div class="chip">Reprovados: <strong id="cbCountRep">0</strong></div>
+          </div>
         </div>
       </div>
 
       <div class="card" style="margin-bottom:12px">
         <div class="table-wrap">
-          <table class="table" id="tblCashbacks" aria-label="Tabela de Cashbacks">
+          <table class="table" id="cbTbl">
             <thead>
               <tr>
                 <th>Data</th>
-                <th>Nick</th>
+                <th>Nick Twitch</th>
                 <th>PIX</th>
                 <th>Status</th>
                 <th>Motivo / Prazo</th>
                 <th>Comprovante</th>
-                <th class="col-acoes">Ações</th>
+                <th>Ações</th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -113,141 +112,264 @@
       </div>
 
       <div class="card">
-        <div class="cb-rank-head">
-          <h3 style="margin:0">🏆 Ranking (Aprovados)</h3>
-          <button id="cbRankReload" class="btn btn--ghost">Atualizar ranking</button>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+          <h3 style="margin:0">Ranking (Aprovados)</h3>
+          <button class="btn ghost" id="cbRankReload" type="button">Atualizar ranking</button>
         </div>
-        <div class="table-wrap">
-          <table class="table" id="tblCashbackRanking" aria-label="Ranking de Cashbacks">
+        <div class="table-wrap" style="margin-top:10px">
+          <table class="table" id="cbRankTbl">
             <thead>
               <tr>
                 <th>#</th>
-                <th>Nick</th>
-                <th>Aprovados</th>
+                <th>Usuário</th>
+                <th>Pontos</th>
               </tr>
             </thead>
             <tbody></tbody>
           </table>
         </div>
-        <p class="muted" style="margin:10px 0 0">(O ranking soma 1 ponto por envio aprovado.)</p>
       </div>
     `;
 
     return tab;
   }
 
-  let modalEl = null;
-
+  let decisionDlg = null;
   function ensureDecisionModal() {
-    if (modalEl) return modalEl;
+    if (decisionDlg) return decisionDlg;
 
     const dlg = document.createElement('dialog');
-    dlg.id = 'cbDecisionModal';
     dlg.className = 'cb-modal';
-
     dlg.innerHTML = `
       <div class="cb-modal-card">
-        <div class="cb-modal-head">
+        <div class="cb-modal-head" style="display:flex;justify-content:space-between;gap:10px;align-items:center">
           <div>
-            <h3 class="cb-modal-title" id="cbModalTitle">Decisão</h3>
-            <p class="cb-modal-sub" id="cbModalSub">—</p>
+            <div style="font-weight:800" id="cbMTitle">Decidir</div>
+            <div class="muted" id="cbMSub">—</div>
           </div>
-          <button type="button" class="cb-x" data-cb-close aria-label="Fechar">×</button>
+          <button type="button" class="btn ghost" data-close>Fechar</button>
         </div>
 
-        <div class="cb-modal-body">
-          <div class="cb-grid">
-            <div>
-              <label class="muted">Status</label>
-              <select id="cbModalStatus" class="input">
-                <option value="APROVADO">✅ APROVADO</option>
-                <option value="REPROVADO">❌ REPROVADO</option>
-              </select>
-            </div>
+        <div style="margin-top:12px;display:grid;gap:10px">
+          <label class="field">
+            <span>Status</span>
+            <select id="cbMStatus" class="input">
+              <option value="APROVADO">APROVADO</option>
+              <option value="REPROVADO">REPROVADO</option>
+              <option value="PENDENTE">PENDENTE</option>
+            </select>
+          </label>
 
-            <div id="cbPrazoWrap">
-              <label class="muted">Prazo do Pix (horas)</label>
-              <input id="cbModalPrazoHoras" class="input" type="number" min="1" value="24">
-            </div>
-          </div>
+          <label class="field" id="cbMPrazoWrap">
+            <span>Prazo (texto)</span>
+            <input id="cbMPrazo" class="input" placeholder="Ex: Pix em até 24h">
+          </label>
 
-          <div style="margin-top:10px">
-            <label class="muted">Motivo (se reprovado) / Observação (opcional)</label>
-            <textarea id="cbModalMotivo" class="input" rows="3" placeholder="Ex: print ilegível / sem data / sem prova"></textarea>
-          </div>
+          <label class="field">
+            <span>Motivo / Observação</span>
+            <textarea id="cbMMotivo" class="input" rows="3" placeholder="Ex: print ilegível / sem data"></textarea>
+          </label>
 
-          <div class="cb-modal-actions">
-            <button type="button" class="btn btn--ghost" data-cb-close>Cancelar</button>
-            <button type="button" class="btn btn--primary" id="cbModalSave">Salvar</button>
+          <div style="display:flex;gap:10px;justify-content:flex-end">
+            <button type="button" class="btn ghost" data-close>Cancelar</button>
+            <button type="button" class="btn" id="cbMSave">Salvar</button>
           </div>
         </div>
       </div>
     `;
-
     document.body.appendChild(dlg);
 
     dlg.addEventListener('click', (e) => {
-      if (e.target === dlg || e.target.closest('[data-cb-close]')) dlg.close();
+      if (e.target === dlg || e.target.closest('[data-close]')) dlg.close();
     });
-    dlg.addEventListener('cancel', (e) => { e.preventDefault(); dlg.close(); });
 
-    const sel = dlg.querySelector('#cbModalStatus');
-    const prazoWrap = dlg.querySelector('#cbPrazoWrap');
+    const sel = dlg.querySelector('#cbMStatus');
+    const prazoWrap = dlg.querySelector('#cbMPrazoWrap');
     const sync = () => {
-      const v = sel.value;
+      const v = String(sel.value || '');
       prazoWrap.style.display = (v === 'APROVADO') ? '' : 'none';
     };
     sel.addEventListener('change', sync);
     sync();
 
-    modalEl = dlg;
+    decisionDlg = dlg;
     return dlg;
   }
 
-  function parsePrazoHoras(payoutWindow) {
-    const s = String(payoutWindow || '');
-    const m = s.match(/(\d+)/);
-    return m ? Math.max(1, parseInt(m[1], 10) || 24) : 24;
+  let proofDlg = null;
+  function ensureProofModal() {
+    if (proofDlg) return proofDlg;
+
+    const dlg = document.createElement('dialog');
+    dlg.className = 'cb-modal';
+    dlg.innerHTML = `
+      <div class="cb-modal-card">
+        <div class="cb-modal-head" style="display:flex;justify-content:space-between;gap:10px;align-items:center">
+          <div>
+            <div style="font-weight:800">Comprovante</div>
+            <div class="muted" id="cbPSub">—</div>
+          </div>
+          <button type="button" class="btn ghost" data-close>Fechar</button>
+        </div>
+        <div style="margin-top:12px">
+          <img id="cbPImg" alt="" style="max-width:100%;border-radius:14px;display:block">
+        </div>
+      </div>
+    `;
+    document.body.appendChild(dlg);
+
+    dlg.addEventListener('click', (e) => {
+      if (e.target === dlg || e.target.closest('[data-close]')) dlg.close();
+    });
+
+    proofDlg = dlg;
+    return dlg;
   }
 
-  function openDecisionModal(item, mode='APROVADO') {
-    const dlg = ensureDecisionModal();
+  const STATE = {
+    list: [],
+    status: 'PENDENTE',
+    search: ''
+  };
 
-    dlg.dataset.id = item?.id || '';
-    const title = dlg.querySelector('#cbModalTitle');
-    const sub   = dlg.querySelector('#cbModalSub');
-    const stSel = dlg.querySelector('#cbModalStatus');
-    const prazo = dlg.querySelector('#cbModalPrazoHoras');
-    const mot   = dlg.querySelector('#cbModalMotivo');
+  function updateCounters(allRows) {
+    const pend = allRows.filter(x => String(x.status || '') === 'PENDENTE').length;
+    const apr  = allRows.filter(x => String(x.status || '') === 'APROVADO').length;
+    const rep  = allRows.filter(x => String(x.status || '') === 'REPROVADO').length;
+
+    const a = qs('#cbCountPend'); if (a) a.textContent = String(pend);
+    const b = qs('#cbCountApr');  if (b) b.textContent = String(apr);
+    const c = qs('#cbCountRep');  if (c) c.textContent = String(rep);
+  }
+
+  function renderTable() {
+    const tab = qs('#tab-cashbacks');
+    if (!tab) return;
+
+    const tbody = qs('#cbTbl tbody', tab);
+    if (!tbody) return;
+
+    const q = String(STATE.search || '').trim().toLowerCase();
+    let arr = Array.isArray(STATE.list) ? [...STATE.list] : [];
+
+    if (q) {
+      arr = arr.filter(x => String(x.twitchName || '').toLowerCase().includes(q));
+    }
+
+    if (!arr.length) {
+      tbody.innerHTML = `<tr><td colspan="7" class="muted" style="padding:14px">Sem registros.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = arr.map(x => {
+      const info = (() => {
+        const s = String(x.status || '');
+        if (s === 'APROVADO') return x.payoutWindow ? `Prazo: <strong>${esc(x.payoutWindow)}</strong>` : 'Aprovado';
+        if (s === 'REPROVADO') return x.reason ? `Motivo: <strong>${esc(x.reason)}</strong>` : 'Reprovado';
+        return x.reason ? `Obs: <strong>${esc(x.reason)}</strong>` : '—';
+      })();
+
+      return `
+        <tr>
+          <td>${esc(fmtDT(x.createdAt))}</td>
+          <td><strong>${esc(x.twitchName || '')}</strong></td>
+          <td>${esc(maskPixKey(x.pixKey || ''))}${x.pixType ? ` <span class="muted">(${esc(x.pixType)})</span>` : ''}</td>
+          <td>${statusBadge(x.status)}</td>
+          <td>${info}</td>
+          <td>${x.hasScreenshot ? `<button class="btn ghost" data-act="proof" data-id="${esc(x.id)}">Abrir</button>` : `<span class="muted">—</span>`}</td>
+          <td>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn" data-act="approve" data-id="${esc(x.id)}">Aprovar</button>
+              <button class="btn ghost" data-act="reject" data-id="${esc(x.id)}">Reprovar</button>
+              <button class="btn ghost" data-act="copy" data-id="${esc(x.id)}">Copiar PIX</button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  async function loadList() {
+    const st = String(STATE.status || 'PENDENTE');
+    const q = st === 'ALL' ? '' : `?status=${encodeURIComponent(st)}&limit=500`;
+    const data = await apiFetch(`/api/cashback/admin/list${q}`, { method: 'GET' });
+    STATE.list = Array.isArray(data?.rows) ? data.rows : [];
+  }
+
+  async function loadCounters() {
+    const data = await apiFetch(`/api/cashback/admin/list?limit=1000`, { method: 'GET' });
+    const allRows = Array.isArray(data?.rows) ? data.rows : [];
+    updateCounters(allRows);
+  }
+
+  async function loadRanking() {
+    const data = await apiFetch(`/api/cashback/admin/list?status=APROVADO&limit=1000`, { method: 'GET' });
+    const rows = Array.isArray(data?.rows) ? data.rows : [];
+
+    const map = new Map();
+    for (const r of rows) {
+      const nick = String(r.twitchName || '').trim();
+      if (!nick) continue;
+      map.set(nick, (map.get(nick) || 0) + 1);
+    }
+
+    const rank = [...map.entries()]
+      .map(([nick, pts]) => ({ nick, pts }))
+      .sort((a, b) => b.pts - a.pts || a.nick.localeCompare(b.nick))
+      .slice(0, 15);
+
+    const tab = qs('#tab-cashbacks');
+    const tbody = qs('#cbRankTbl tbody', tab);
+    if (!tbody) return;
+
+    if (!rank.length) {
+      tbody.innerHTML = `<tr><td colspan="3" class="muted" style="padding:14px">Sem ranking ainda.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = rank.map((x, i) => `
+      <tr>
+        <td>${i + 1}</td>
+        <td><strong>${esc(x.nick)}</strong></td>
+        <td>${esc(String(x.pts))}</td>
+      </tr>
+    `).join('');
+  }
+
+  function openDecision(item, mode) {
+    const dlg = ensureDecisionModal();
+    dlg.dataset.id = item.id;
+
+    const title = dlg.querySelector('#cbMTitle');
+    const sub = dlg.querySelector('#cbMSub');
+    const st = dlg.querySelector('#cbMStatus');
+    const prazo = dlg.querySelector('#cbMPrazo');
+    const motivo = dlg.querySelector('#cbMMotivo');
 
     title.textContent = 'Decidir Cashback';
-    sub.textContent = `${item?.twitchName || '—'} • ${item?.id || ''}`;
+    sub.textContent = `${item.twitchName || '—'} • ${item.id || ''}`;
 
-    stSel.value = (mode === 'REPROVADO') ? 'REPROVADO' : 'APROVADO';
-    prazo.value = String(parsePrazoHoras(item?.payoutWindow));
-    mot.value   = (mode === 'REPROVADO') ? '' : (item?.reason || '');
+    st.value = mode === 'reject' ? 'REPROVADO' : 'APROVADO';
+    prazo.value = item.payoutWindow || 'Pix em até 24h';
+    motivo.value = item.reason || '';
 
-    stSel.dispatchEvent(new Event('change'));
+    st.dispatchEvent(new Event('change'));
 
     if (typeof dlg.showModal === 'function') dlg.showModal();
-    else dlg.setAttribute('open','');
+    else dlg.setAttribute('open', '');
   }
 
-  async function saveDecisionFromModal() {
+  async function saveDecision() {
     const dlg = ensureDecisionModal();
-    const id  = dlg.dataset.id;
+    const id = dlg.dataset.id;
     if (!id) return;
 
-    const stSel = dlg.querySelector('#cbModalStatus');
-    const prazo = dlg.querySelector('#cbModalPrazoHoras');
-    const mot   = dlg.querySelector('#cbModalMotivo');
-    const btn   = dlg.querySelector('#cbModalSave');
+    const st = dlg.querySelector('#cbMStatus').value;
+    const prazo = String(dlg.querySelector('#cbMPrazo').value || '').trim();
+    const motivo = String(dlg.querySelector('#cbMMotivo').value || '').trim();
+    const btn = dlg.querySelector('#cbMSave');
 
-    const status = stSel.value;
-    const reason = String(mot.value || '').trim();
-    const prazoHoras = Math.max(1, parseInt(prazo.value, 10) || 24);
-
-    if (status === 'REPROVADO' && !reason) {
+    if (st === 'REPROVADO' && !motivo) {
       notify('Pra reprovado, informe um motivo.', 'error');
       return;
     }
@@ -257,275 +379,125 @@
       await apiFetch(`/api/cashback/admin/${encodeURIComponent(id)}`, {
         method: 'PATCH',
         body: JSON.stringify({
-          status,
-          reason: reason || null,
-          payoutWindow: status === 'APROVADO' ? `${prazoHoras}h` : null
+          status: st,
+          reason: motivo || null,
+          payoutWindow: st === 'APROVADO' ? (prazo || 'Pix em até 24h') : null
         })
       });
 
       dlg.close();
-      notify('Cashback atualizado.', 'ok');
       await CashbackAdmin.refresh();
+      notify('Atualizado.', 'ok');
     } catch (e) {
-      console.error(e);
       notify(`Erro: ${e.message}`, 'error');
     } finally {
       btn.disabled = false;
     }
   }
 
-  const STATE = {
-    list: [],
-    ranking: [],
-    filterStatus: 'PENDENTE',
-    search: '',
-    loading: false
-  };
-
-  function applyFilters(arr) {
-    let out = [...(arr || [])];
-
-    const fs = String(STATE.filterStatus || 'all').toUpperCase();
-    if (fs !== 'ALL') out = out.filter(x => String(x.status||'PENDENTE').toUpperCase() === fs);
-
-    const q = String(STATE.search || '').trim().toLowerCase();
-    if (q) {
-      out = out.filter(x => {
-        const nick = String(x.twitchName || '').toLowerCase();
-        const pix  = String(x.pixKey || '').toLowerCase();
-        const id   = String(x.id || '').toLowerCase();
-        return nick.includes(q) || pix.includes(q) || id.includes(q);
-      });
-    }
-
-    out.sort((a,b)=> new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0));
-    return out;
-  }
-
-  function updateCounters(arrAll) {
-    const pend = arrAll.filter(x => String(x.status||'PENDENTE').toUpperCase() === 'PENDENTE').length;
-    const apr  = arrAll.filter(x => String(x.status||'PENDENTE').toUpperCase() === 'APROVADO').length;
-    const rep  = arrAll.filter(x => String(x.status||'PENDENTE').toUpperCase() === 'REPROVADO').length;
-
-    const a = qs('#cbCountPendente'); if (a) a.textContent = String(pend);
-    const b = qs('#cbCountAprovado'); if (b) b.textContent = String(apr);
-    const c = qs('#cbCountReprovado'); if (c) c.textContent = String(rep);
-  }
-
-  function renderTable() {
-    const tab = qs('#tab-cashbacks');
-    if (!tab) return;
-
-    const tbody = qs('#tblCashbacks tbody', tab);
-    if (!tbody) return;
-
-    updateCounters(STATE.list);
-
-    const arr = applyFilters(STATE.list);
-
-    if (STATE.loading) {
-      tbody.innerHTML = `<tr><td colspan="7" class="muted" style="padding:14px">Carregando…</td></tr>`;
-      return;
-    }
-
-    if (!arr.length) {
-      tbody.innerHTML = `<tr><td colspan="7" class="muted" style="padding:14px">Sem registros.</td></tr>`;
-      return;
-    }
-
-    tbody.innerHTML = arr.map(x => {
-      const st = statusMeta(x.status);
-      const pix = maskPixKey(x.pixKey || '');
-      const pixType = x.pixType ? ` (${esc(x.pixType)})` : '';
-      const reason = esc(x.reason || '');
-      const payoutWindow = esc(x.payoutWindow || '');
-
-      let info = '—';
-      if (String(x.status||'').toUpperCase() === 'APROVADO') {
-        info = payoutWindow ? `Pix em até <strong>${payoutWindow}</strong>` : 'Pix aprovado';
-      } else if (String(x.status||'').toUpperCase() === 'REPROVADO') {
-        info = reason ? `Motivo: <strong>${reason}</strong>` : 'Reprovado';
-      } else if (reason) {
-        info = `Obs: <strong>${reason}</strong>`;
-      }
-
-      const proofBtn = x.hasScreenshot
-        ? `<button class="btn btn--ghost cb-mini" data-action="cb-proof" data-id="${esc(x.id)}">Abrir</button>`
-        : `<span class="muted">—</span>`;
-
-      const actions = `
-        <div class="cb-actions-row">
-          <button class="btn btn--primary cb-mini" data-action="cb-approve" data-id="${esc(x.id)}">Aprovar</button>
-          <button class="btn btn--danger  cb-mini" data-action="cb-reject"  data-id="${esc(x.id)}">Reprovar</button>
-          <button class="btn cb-mini" data-action="cb-copy-pix" data-id="${esc(x.id)}">Copiar PIX</button>
-        </div>
-      `;
-
-      return `
-        <tr data-id="${esc(x.id)}">
-          <td>${fmtDT(x.createdAt)}</td>
-          <td><strong>${esc(x.twitchName || '')}</strong></td>
-          <td>
-            <div class="cb-pix">
-              <span class="cb-pix-key">${esc(pix)}</span>
-              <span class="cb-pix-type">${pixType ? esc(pixType) : ''}</span>
-            </div>
-          </td>
-          <td><span class="${st.cls}">${st.label}</span></td>
-          <td>${info}</td>
-          <td>${proofBtn}</td>
-          <td class="col-acoes">${actions}</td>
-        </tr>
-      `;
-    }).join('');
-  }
-
-  function computeRankingFromList(list) {
-    const map = new Map();
-    for (const x of (list || [])) {
-      if (String(x.status || '').toUpperCase() !== 'APROVADO') continue;
-      const nick = String(x.twitchName || '').trim();
-      if (!nick) continue;
-      const k = nick.toLowerCase();
-      const cur = map.get(k) || { nick, aprovados: 0 };
-      cur.aprovados += 1;
-      map.set(k, cur);
-    }
-    return [...map.values()].sort((a,b)=> (b.aprovados - a.aprovados) || a.nick.localeCompare(b.nick, 'pt-BR'));
-  }
-
-  function renderRanking() {
-    const tab = qs('#tab-cashbacks');
-    if (!tab) return;
-
-    const tbody = qs('#tblCashbackRanking tbody', tab);
-    if (!tbody) return;
-
-    const arr = Array.isArray(STATE.ranking) ? STATE.ranking : [];
-    if (!arr.length) {
-      tbody.innerHTML = `<tr><td colspan="3" class="muted" style="padding:14px">Sem ranking ainda.</td></tr>`;
-      return;
-    }
-
-    tbody.innerHTML = arr.slice(0, 15).map((x, i) => `
-      <tr>
-        <td>${i+1}</td>
-        <td><strong>${esc(x.nick)}</strong></td>
-        <td>${esc(String(x.aprovados))}</td>
-      </tr>
-    `).join('');
-  }
-
-  async function loadList() {
-    STATE.loading = true;
-    renderTable();
+  async function openProof(id) {
+    const dlg = ensureProofModal();
     try {
-      const data = await apiFetch('/api/cashback/admin/list?limit=1000');
-      STATE.list = Array.isArray(data?.rows) ? data.rows : [];
-    } finally {
-      STATE.loading = false;
-    }
-  }
+      const data = await apiFetch(`/api/cashback/admin/${encodeURIComponent(id)}`, { method: 'GET' });
+      const row = data?.row;
+      const img = dlg.querySelector('#cbPImg');
+      const sub = dlg.querySelector('#cbPSub');
 
-  function findById(id) {
-    return (STATE.list || []).find(x => String(x.id) === String(id));
+      sub.textContent = `${row?.twitchName || '—'} • ${row?.id || ''}`;
+      img.src = row?.screenshotDataUrl || '';
+
+      if (typeof dlg.showModal === 'function') dlg.showModal();
+      else dlg.setAttribute('open', '');
+    } catch (e) {
+      notify(`Erro: ${e.message}`, 'error');
+    }
   }
 
   function bindUI() {
-    const tab = ensureBaseUI();
+    const tab = ensureUI();
     if (!tab) return;
 
-    const filterSel = qs('#cbFilterStatus', tab);
-    const searchInp = qs('#cbSearch', tab);
-    const reloadBtn = qs('#cbReload', tab);
-    const rankBtn   = qs('#cbRankReload', tab);
+    const reload = qs('#cbReload', tab);
+    const copy = qs('#cbCopyLink', tab);
+    const search = qs('#cbSearch', tab);
+    const status = qs('#cbStatus', tab);
+    const rankReload = qs('#cbRankReload', tab);
 
-    if (filterSel) {
-      filterSel.value = STATE.filterStatus || 'PENDENTE';
-      filterSel.addEventListener('change', () => {
-        STATE.filterStatus = filterSel.value;
-        renderTable();
-      });
-    }
+    reload?.addEventListener('click', () => CashbackAdmin.refresh());
 
-    if (searchInp) {
-      searchInp.addEventListener('input', debounce(() => {
-        STATE.search = searchInp.value || '';
-        renderTable();
-      }, 200));
-    }
+    copy?.addEventListener('click', async () => {
+      const link = `${window.location.origin}/cashback-publico.html`;
+      try {
+        await navigator.clipboard.writeText(link);
+        notify('Link copiado!', 'ok');
+      } catch {
+        notify('Não consegui copiar automaticamente. Copie manualmente: ' + link, 'error');
+      }
+    });
 
-    if (reloadBtn) reloadBtn.addEventListener('click', () => CashbackAdmin.refresh());
-    if (rankBtn) rankBtn.addEventListener('click', async () => {
-      STATE.ranking = computeRankingFromList(STATE.list);
-      renderRanking();
+    search?.addEventListener('input', () => {
+      STATE.search = search.value || '';
+      renderTable();
+    });
+
+    status?.addEventListener('change', async () => {
+      STATE.status = status.value || 'PENDENTE';
+      await CashbackAdmin.refresh(false);
+    });
+
+    rankReload?.addEventListener('click', async () => {
+      await loadRanking();
       notify('Ranking atualizado.', 'ok');
     });
 
     tab.addEventListener('click', async (e) => {
-      const btn = e.target.closest('button[data-action]');
+      const btn = e.target.closest('button[data-act]');
       if (!btn) return;
 
-      const action = btn.dataset.action;
+      const act = btn.dataset.act;
       const id = btn.dataset.id;
-      const item = findById(id);
+
+      const item = (STATE.list || []).find(x => String(x.id) === String(id));
       if (!item) return;
 
-      if (action === 'cb-approve') return openDecisionModal(item, 'APROVADO');
-      if (action === 'cb-reject')  return openDecisionModal(item, 'REPROVADO');
+      if (act === 'approve') return openDecision(item, 'approve');
+      if (act === 'reject') return openDecision(item, 'reject');
 
-      if (action === 'cb-copy-pix') {
+      if (act === 'copy') {
         const raw = item.pixKey || '';
         if (!raw) return notify('Esse envio não tem PIX.', 'error');
         try {
           await navigator.clipboard.writeText(String(raw));
           notify('PIX copiado!', 'ok');
         } catch {
-          notify('Não consegui copiar automaticamente. Copie manualmente.', 'error');
+          notify('Não consegui copiar automaticamente.', 'error');
         }
         return;
       }
 
-      if (action === 'cb-proof') {
-        try {
-          const data = await apiFetch(`/api/cashback/admin/${encodeURIComponent(id)}`, { method: 'GET' });
-          const url = data?.row?.screenshotDataUrl || '';
-          if (!url) return notify('Sem comprovante nesse envio.', 'error');
-          const w = window.open();
-          if (w) w.location.href = url;
-          else window.open(url, '_blank', 'noopener,noreferrer');
-        } catch (err) {
-          notify(`Erro ao abrir comprovante: ${err.message}`, 'error');
-        }
-        return;
-      }
+      if (act === 'proof') return openProof(id);
     });
 
     const dlg = ensureDecisionModal();
-    const saveBtn = dlg.querySelector('#cbModalSave');
-    if (saveBtn) saveBtn.addEventListener('click', saveDecisionFromModal);
+    dlg.querySelector('#cbMSave')?.addEventListener('click', saveDecision);
   }
 
   const CashbackAdmin = {
     init() {
-      ensureBaseUI();
+      ensureUI();
       bindUI();
     },
-    async refresh() {
+    async refresh(withCounters = true) {
       try {
         await loadList();
         renderTable();
-        STATE.ranking = computeRankingFromList(STATE.list);
-        renderRanking();
+        if (withCounters) await loadCounters();
+        await loadRanking();
       } catch (e) {
         console.error(e);
-        notify(`Erro ao carregar cashbacks: ${e.message}`, 'error');
+        notify(`Erro ao carregar: ${e.message}`, 'error');
         renderTable();
-        renderRanking();
       }
-    },
-    onTabShown() {
-      CashbackAdmin.refresh();
     }
   };
 
