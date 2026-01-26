@@ -63,13 +63,14 @@ function formatDate(v) {
 }
 
 async function apiFetch(url, opts = {}) {
+  if (!key) throw new Error('sem_app_key');
+
   const headers = Object.assign({}, opts.headers || {});
-  if (key) headers['X-APP-KEY'] = key;
+  headers['X-APP-KEY'] = key;
 
   const res = await fetch(url, { ...opts, headers });
   let data = null;
   try { data = await res.json(); } catch {}
-
   if (!res.ok) {
     const msg = data?.error || `http_${res.status}`;
     throw new Error(msg);
@@ -123,11 +124,6 @@ screenshot.addEventListener('change', async () => {
 form.addEventListener('submit', async (ev) => {
   ev.preventDefault();
 
-  if (!key) {
-    submitResult.innerHTML = `<div class="msgTitle">Configuração faltando</div><div class="msgLine">Defina <strong>&lt;meta name="app-key"&gt;</strong> no HTML.</div>`;
-    return;
-  }
-
   const body = {
     twitchName: twitchName.value.trim(),
     pixType: pixType.value,
@@ -164,6 +160,7 @@ form.addEventListener('submit', async (ev) => {
     const msg = String(e.message || 'erro');
     let nice = msg;
 
+    if (msg === 'sem_app_key') nice = 'Falta app-key no HTML (meta[name="app-key"]).';
     if (msg === 'screenshot_grande') nice = 'Imagem grande demais.';
     if (msg === 'screenshot_invalida') nice = 'Screenshot inválida.';
     if (msg === 'dados_invalidos') nice = 'Dados inválidos. Verifique os campos.';
@@ -183,12 +180,6 @@ async function checkStatus(user) {
   if (!u) {
     statusResult.innerHTML = `<div class="msgLine">Digite seu nick da Twitch.</div>`;
     setBadge(statusBadge, 'Aguardando', '');
-    return;
-  }
-
-  if (!key) {
-    statusResult.innerHTML = `<div class="msgLine">Falta configurar a <strong>app-key</strong> no HTML.</div>`;
-    setBadge(statusBadge, 'Bloqueado', '');
     return;
   }
 
@@ -234,11 +225,6 @@ statusUser.addEventListener('keydown', (e) => {
 });
 
 async function loadRanking() {
-  if (!key) {
-    rankList.innerHTML = `<div class="muted">Falta configurar a <strong>app-key</strong> no HTML.</div>`;
-    return;
-  }
-
   try {
     const data = await apiFetch('/api/cashback/ranking?limit=10', { method: 'GET' });
     const rows = data?.rows || [];
@@ -267,7 +253,7 @@ async function loadRanking() {
 
 function init() {
   keyChip.textContent = key ? `Chave pública: ${key.slice(0, 6)}…${key.slice(-4)}` : 'Chave pública: ausente';
-  setApiStatus(key ? 'ok' : 'sem app-key');
+  setApiStatus('ok');
   loadRanking();
 }
 

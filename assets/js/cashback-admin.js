@@ -1,16 +1,13 @@
-/* assets/js/cashback-admin.js */
 (() => {
   const API = window.location.origin;
 
   const qs  = (s, r=document) => r.querySelector(s);
-  const qsa = (s, r=document) => [...r.querySelectorAll(s)];
 
   function getCookie(name) {
     const m = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([$?*|{}\\^])/g, '\\$1') + '=([^;]*)'));
     return m ? decodeURIComponent(m[1]) : null;
   }
 
-  // Tenta usar apiFetch global, se existir. Se não existir, cria um fallback.
   async function apiFetch(path, opts = {}) {
     if (typeof window.apiFetch === 'function') return window.apiFetch(path, opts);
 
@@ -32,7 +29,6 @@
   }
 
   const esc = (s='') => String(s).replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
-  const fmtBRL = (cents) => (Number(cents||0)/100).toLocaleString('pt-BR', { style:'currency', currency:'BRL' });
   const fmtDT  = (d) => {
     if (!d) return '—';
     const dt = new Date(d);
@@ -57,20 +53,16 @@
     return `${k.slice(0, 3)}…${k.slice(-4)}`;
   }
 
-  function statusMeta(status='pendente'){
-    const s = String(status||'').toLowerCase();
-    if (s === 'aprovado') return { label:'✅ APROVADO', cls:'cb-badge cb-badge--ok' };
-    if (s === 'reprovado') return { label:'❌ REPROVADO', cls:'cb-badge cb-badge--no' };
+  function statusMeta(status='PENDENTE'){
+    const s = String(status||'PENDENTE').toUpperCase();
+    if (s === 'APROVADO') return { label:'✅ APROVADO', cls:'cb-badge cb-badge--ok' };
+    if (s === 'REPROVADO') return { label:'❌ REPROVADO', cls:'cb-badge cb-badge--no' };
     return { label:'⏳ PENDENTE', cls:'cb-badge cb-badge--pend' };
   }
 
-  // ---------- DOM / UI base ----------
   function ensureBaseUI() {
-    // precisa existir a tab
     const tab = qs('#tab-cashbacks');
     if (!tab) return null;
-
-    // se já tem tabela, não mexe
     if (qs('#tblCashbacks', tab)) return tab;
 
     tab.innerHTML = `
@@ -78,17 +70,15 @@
         <div class="cb-head">
           <div>
             <h2 style="margin:0">💸 Cashbacks</h2>
-            <p class="muted" style="margin:6px 0 0">
-              Painel de revisão: aprovar/reprovar e ver comprovante.
-            </p>
+            <p class="muted" style="margin:6px 0 0">Painel de revisão: aprovar/reprovar e ver comprovante.</p>
           </div>
 
           <div class="cb-actions">
             <select id="cbFilterStatus" class="input">
               <option value="all">Todos</option>
-              <option value="pendente" selected>Pendentes</option>
-              <option value="aprovado">Aprovados</option>
-              <option value="reprovado">Reprovados</option>
+              <option value="PENDENTE" selected>Pendentes</option>
+              <option value="APROVADO">Aprovados</option>
+              <option value="REPROVADO">Reprovados</option>
             </select>
 
             <input id="cbSearch" class="input" placeholder="Buscar por nick / pix / id…">
@@ -139,16 +129,13 @@
             <tbody></tbody>
           </table>
         </div>
-        <p class="muted" style="margin:10px 0 0">
-          (O ranking soma 1 ponto por envio aprovado.)
-        </p>
+        <p class="muted" style="margin:10px 0 0">(O ranking soma 1 ponto por envio aprovado.)</p>
       </div>
     `;
 
     return tab;
   }
 
-  // ---------- Modal (aprovar/reprovar) ----------
   let modalEl = null;
 
   function ensureDecisionModal() {
@@ -173,8 +160,8 @@
             <div>
               <label class="muted">Status</label>
               <select id="cbModalStatus" class="input">
-                <option value="aprovado">✅ APROVADO</option>
-                <option value="reprovado">❌ REPROVADO</option>
+                <option value="APROVADO">✅ APROVADO</option>
+                <option value="REPROVADO">❌ REPROVADO</option>
               </select>
             </div>
 
@@ -208,8 +195,7 @@
     const prazoWrap = dlg.querySelector('#cbPrazoWrap');
     const sync = () => {
       const v = sel.value;
-      // prazo só faz sentido no aprovado
-      prazoWrap.style.display = (v === 'aprovado') ? '' : 'none';
+      prazoWrap.style.display = (v === 'APROVADO') ? '' : 'none';
     };
     sel.addEventListener('change', sync);
     sync();
@@ -218,7 +204,13 @@
     return dlg;
   }
 
-  function openDecisionModal(item, mode='aprovado') {
+  function parsePrazoHoras(payoutWindow) {
+    const s = String(payoutWindow || '');
+    const m = s.match(/(\d+)/);
+    return m ? Math.max(1, parseInt(m[1], 10) || 24) : 24;
+  }
+
+  function openDecisionModal(item, mode='APROVADO') {
     const dlg = ensureDecisionModal();
 
     dlg.dataset.id = item?.id || '';
@@ -229,13 +221,12 @@
     const mot   = dlg.querySelector('#cbModalMotivo');
 
     title.textContent = 'Decidir Cashback';
-    sub.textContent = `${item?.twitchNick || item?.nick || '—'} • ${item?.id || ''}`;
+    sub.textContent = `${item?.twitchName || '—'} • ${item?.id || ''}`;
 
-    stSel.value = mode === 'reprovado' ? 'reprovado' : 'aprovado';
-    prazo.value = String(item?.payoutPrazoHoras || item?.payout_window_hours || 24);
-    mot.value   = (mode === 'reprovado') ? '' : (item?.motivo || item?.reason || '');
+    stSel.value = (mode === 'REPROVADO') ? 'REPROVADO' : 'APROVADO';
+    prazo.value = String(parsePrazoHoras(item?.payoutWindow));
+    mot.value   = (mode === 'REPROVADO') ? '' : (item?.reason || '');
 
-    // dispara sync display
     stSel.dispatchEvent(new Event('change'));
 
     if (typeof dlg.showModal === 'function') dlg.showModal();
@@ -253,24 +244,22 @@
     const btn   = dlg.querySelector('#cbModalSave');
 
     const status = stSel.value;
-    const motivo = String(mot.value || '').trim();
+    const reason = String(mot.value || '').trim();
     const prazoHoras = Math.max(1, parseInt(prazo.value, 10) || 24);
 
-    if (status === 'reprovado' && !motivo) {
+    if (status === 'REPROVADO' && !reason) {
       notify('Pra reprovado, informe um motivo.', 'error');
       return;
     }
 
     btn.disabled = true;
     try {
-      // Endpoint pensado pro server.js (você vai criar depois):
-      // PATCH /api/cashbacks/:id  { status, motivo, prazoHoras }
-      await apiFetch(`/api/cashbacks/${encodeURIComponent(id)}`, {
+      await apiFetch(`/api/cashback/admin/${encodeURIComponent(id)}`, {
         method: 'PATCH',
         body: JSON.stringify({
           status,
-          motivo: motivo || null,
-          prazoHoras: status === 'aprovado' ? prazoHoras : null
+          reason: reason || null,
+          payoutWindow: status === 'APROVADO' ? `${prazoHoras}h` : null
         })
       });
 
@@ -285,11 +274,10 @@
     }
   }
 
-  // ---------- Render ----------
   const STATE = {
     list: [],
     ranking: [],
-    filterStatus: 'pendente',
+    filterStatus: 'PENDENTE',
     search: '',
     loading: false
   };
@@ -297,28 +285,27 @@
   function applyFilters(arr) {
     let out = [...(arr || [])];
 
-    const fs = String(STATE.filterStatus || 'all').toLowerCase();
-    if (fs !== 'all') out = out.filter(x => String(x.status||'pendente').toLowerCase() === fs);
+    const fs = String(STATE.filterStatus || 'all').toUpperCase();
+    if (fs !== 'ALL') out = out.filter(x => String(x.status||'PENDENTE').toUpperCase() === fs);
 
     const q = String(STATE.search || '').trim().toLowerCase();
     if (q) {
       out = out.filter(x => {
-        const nick = String(x.twitchNick || x.nick || '').toLowerCase();
-        const pix  = String(x.pixKey || x.pix || '').toLowerCase();
+        const nick = String(x.twitchName || '').toLowerCase();
+        const pix  = String(x.pixKey || '').toLowerCase();
         const id   = String(x.id || '').toLowerCase();
         return nick.includes(q) || pix.includes(q) || id.includes(q);
       });
     }
 
-    // mais novos primeiro
-    out.sort((a,b)=> new Date(b.createdAt || b.created_at || 0) - new Date(a.createdAt || a.created_at || 0));
+    out.sort((a,b)=> new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0));
     return out;
   }
 
   function updateCounters(arrAll) {
-    const pend = arrAll.filter(x => String(x.status||'pendente').toLowerCase() === 'pendente').length;
-    const apr  = arrAll.filter(x => String(x.status||'pendente').toLowerCase() === 'aprovado').length;
-    const rep  = arrAll.filter(x => String(x.status||'pendente').toLowerCase() === 'reprovado').length;
+    const pend = arrAll.filter(x => String(x.status||'PENDENTE').toUpperCase() === 'PENDENTE').length;
+    const apr  = arrAll.filter(x => String(x.status||'PENDENTE').toUpperCase() === 'APROVADO').length;
+    const rep  = arrAll.filter(x => String(x.status||'PENDENTE').toUpperCase() === 'REPROVADO').length;
 
     const a = qs('#cbCountPendente'); if (a) a.textContent = String(pend);
     const b = qs('#cbCountAprovado'); if (b) b.textContent = String(apr);
@@ -348,26 +335,24 @@
 
     tbody.innerHTML = arr.map(x => {
       const st = statusMeta(x.status);
-      const pix = maskPixKey(x.pixKey || x.pix || '');
+      const pix = maskPixKey(x.pixKey || '');
       const pixType = x.pixType ? ` (${esc(x.pixType)})` : '';
-      const motivo = esc(x.motivo || x.reason || '');
-      const prazoH = x.payoutPrazoHoras ?? x.prazoHoras ?? x.payout_window_hours ?? null;
+      const reason = esc(x.reason || '');
+      const payoutWindow = esc(x.payoutWindow || '');
 
       let info = '—';
-      if (String(x.status||'').toLowerCase() === 'aprovado') {
-        info = prazoH ? `Pix em até <strong>${esc(String(prazoH))}h</strong>` : 'Pix aprovado';
-      } else if (String(x.status||'').toLowerCase() === 'reprovado') {
-        info = motivo ? `Motivo: <strong>${motivo}</strong>` : 'Reprovado';
-      } else if (motivo) {
-        info = `Obs: <strong>${motivo}</strong>`;
+      if (String(x.status||'').toUpperCase() === 'APROVADO') {
+        info = payoutWindow ? `Pix em até <strong>${payoutWindow}</strong>` : 'Pix aprovado';
+      } else if (String(x.status||'').toUpperCase() === 'REPROVADO') {
+        info = reason ? `Motivo: <strong>${reason}</strong>` : 'Reprovado';
+      } else if (reason) {
+        info = `Obs: <strong>${reason}</strong>`;
       }
 
-      const proofUrl = x.proofUrl || x.printUrl || x.screenshotUrl || x.comprovanteUrl || '';
-      const proofBtn = proofUrl
+      const proofBtn = x.hasScreenshot
         ? `<button class="btn btn--ghost cb-mini" data-action="cb-proof" data-id="${esc(x.id)}">Abrir</button>`
         : `<span class="muted">—</span>`;
 
-      // ações
       const actions = `
         <div class="cb-actions-row">
           <button class="btn btn--primary cb-mini" data-action="cb-approve" data-id="${esc(x.id)}">Aprovar</button>
@@ -378,8 +363,8 @@
 
       return `
         <tr data-id="${esc(x.id)}">
-          <td>${fmtDT(x.createdAt || x.created_at)}</td>
-          <td><strong>${esc(x.twitchNick || x.nick || '')}</strong></td>
+          <td>${fmtDT(x.createdAt)}</td>
+          <td><strong>${esc(x.twitchName || '')}</strong></td>
           <td>
             <div class="cb-pix">
               <span class="cb-pix-key">${esc(pix)}</span>
@@ -395,6 +380,20 @@
     }).join('');
   }
 
+  function computeRankingFromList(list) {
+    const map = new Map();
+    for (const x of (list || [])) {
+      if (String(x.status || '').toUpperCase() !== 'APROVADO') continue;
+      const nick = String(x.twitchName || '').trim();
+      if (!nick) continue;
+      const k = nick.toLowerCase();
+      const cur = map.get(k) || { nick, aprovados: 0 };
+      cur.aprovados += 1;
+      map.set(k, cur);
+    }
+    return [...map.values()].sort((a,b)=> (b.aprovados - a.aprovados) || a.nick.localeCompare(b.nick, 'pt-BR'));
+  }
+
   function renderRanking() {
     const tab = qs('#tab-cashbacks');
     if (!tab) return;
@@ -408,42 +407,23 @@
       return;
     }
 
-    tbody.innerHTML = arr.slice(0, 15).map((x, i) => {
-      const nick = x.nick || x.usuario || x.twitchNick || '';
-      const pts  = x.aprovados ?? x.pontos ?? x.count ?? 0;
-      return `
-        <tr>
-          <td>${i+1}</td>
-          <td><strong>${esc(nick)}</strong></td>
-          <td>${esc(String(pts))}</td>
-        </tr>
-      `;
-    }).join('');
+    tbody.innerHTML = arr.slice(0, 15).map((x, i) => `
+      <tr>
+        <td>${i+1}</td>
+        <td><strong>${esc(x.nick)}</strong></td>
+        <td>${esc(String(x.aprovados))}</td>
+      </tr>
+    `).join('');
   }
 
-  // ---------- Data load ----------
   async function loadList() {
-    // Endpoint pensado pro server.js:
-    // GET /api/cashbacks  -> retorna array
     STATE.loading = true;
     renderTable();
     try {
-      const list = await apiFetch('/api/cashbacks');
-      STATE.list = Array.isArray(list) ? list : (list?.rows || []);
+      const data = await apiFetch('/api/cashback/admin/list?limit=1000');
+      STATE.list = Array.isArray(data?.rows) ? data.rows : [];
     } finally {
       STATE.loading = false;
-    }
-  }
-
-  async function loadRanking() {
-    // Endpoint pensado pro server.js:
-    // GET /api/cashbacks/ranking?limit=10 -> [{nick, aprovados}]
-    try {
-      const r = await apiFetch('/api/cashbacks/ranking?limit=10');
-      STATE.ranking = Array.isArray(r) ? r : (r?.rows || []);
-    } catch (e) {
-      // se ainda não existir rota, não quebra o painel
-      STATE.ranking = [];
     }
   }
 
@@ -451,7 +431,6 @@
     return (STATE.list || []).find(x => String(x.id) === String(id));
   }
 
-  // ---------- Events ----------
   function bindUI() {
     const tab = ensureBaseUI();
     if (!tab) return;
@@ -462,7 +441,7 @@
     const rankBtn   = qs('#cbRankReload', tab);
 
     if (filterSel) {
-      filterSel.value = STATE.filterStatus || 'pendente';
+      filterSel.value = STATE.filterStatus || 'PENDENTE';
       filterSel.addEventListener('change', () => {
         STATE.filterStatus = filterSel.value;
         renderTable();
@@ -478,12 +457,11 @@
 
     if (reloadBtn) reloadBtn.addEventListener('click', () => CashbackAdmin.refresh());
     if (rankBtn) rankBtn.addEventListener('click', async () => {
-      await loadRanking();
+      STATE.ranking = computeRankingFromList(STATE.list);
       renderRanking();
       notify('Ranking atualizado.', 'ok');
     });
 
-    // ações da tabela
     tab.addEventListener('click', async (e) => {
       const btn = e.target.closest('button[data-action]');
       if (!btn) return;
@@ -493,18 +471,11 @@
       const item = findById(id);
       if (!item) return;
 
-      if (action === 'cb-approve') {
-        openDecisionModal(item, 'aprovado');
-        return;
-      }
-
-      if (action === 'cb-reject') {
-        openDecisionModal(item, 'reprovado');
-        return;
-      }
+      if (action === 'cb-approve') return openDecisionModal(item, 'APROVADO');
+      if (action === 'cb-reject')  return openDecisionModal(item, 'REPROVADO');
 
       if (action === 'cb-copy-pix') {
-        const raw = item.pixKey || item.pix || '';
+        const raw = item.pixKey || '';
         if (!raw) return notify('Esse envio não tem PIX.', 'error');
         try {
           await navigator.clipboard.writeText(String(raw));
@@ -516,21 +487,25 @@
       }
 
       if (action === 'cb-proof') {
-        const url = item.proofUrl || item.printUrl || item.screenshotUrl || item.comprovanteUrl || '';
-        if (!url) return notify('Sem comprovante nesse envio.', 'error');
-        // abre em nova aba
-        window.open(url, '_blank', 'noopener,noreferrer');
+        try {
+          const data = await apiFetch(`/api/cashback/admin/${encodeURIComponent(id)}`, { method: 'GET' });
+          const url = data?.row?.screenshotDataUrl || '';
+          if (!url) return notify('Sem comprovante nesse envio.', 'error');
+          const w = window.open();
+          if (w) w.location.href = url;
+          else window.open(url, '_blank', 'noopener,noreferrer');
+        } catch (err) {
+          notify(`Erro ao abrir comprovante: ${err.message}`, 'error');
+        }
         return;
       }
     });
 
-    // salvar do modal
     const dlg = ensureDecisionModal();
     const saveBtn = dlg.querySelector('#cbModalSave');
     if (saveBtn) saveBtn.addEventListener('click', saveDecisionFromModal);
   }
 
-  // ---------- Public API ----------
   const CashbackAdmin = {
     init() {
       ensureBaseUI();
@@ -540,7 +515,7 @@
       try {
         await loadList();
         renderTable();
-        await loadRanking();
+        STATE.ranking = computeRankingFromList(STATE.list);
         renderRanking();
       } catch (e) {
         console.error(e);
@@ -550,19 +525,15 @@
       }
     },
     onTabShown() {
-      // quando clicar na aba, atualiza (leve)
       CashbackAdmin.refresh();
     }
   };
 
   window.CashbackAdmin = CashbackAdmin;
 
-  // auto-init quando DOM pronto (não quebra se não tiver tab)
   document.addEventListener('DOMContentLoaded', () => {
     if (qs('#tab-cashbacks')) {
       CashbackAdmin.init();
-      // não força refresh se você preferir carregar só quando abrir a aba,
-      // mas vou carregar uma vez pra já aparecer.
       CashbackAdmin.refresh();
     }
   });
