@@ -1,3 +1,5 @@
+// assets/js/area.js
+
 const API = window.location.origin;
 const qs  = (s, r=document) => r.querySelector(s);
 const qsa = (s, r=document) => [...r.querySelectorAll(s)];
@@ -168,14 +170,13 @@ function buildPixBRCode({ chave, valorCents, nome, cidade = 'BRASILIA', txid = '
   return payloadSemCRC + crc;
 }
 
-
-
 const tabBancasEl     = qs('#tab-bancas');
 const tabPagamentosEl = qs('#tab-pagamentos');
 const tabExtratosEl   = qs('#tab-extratos');
 const tabCuponsEl     = qs('#tab-cupons');
 const tabSorteioEl    = qs('#tab-sorteio');
-const tabPalpiteEl    = qs('#tab-palpite'); 
+const tabPalpiteEl    = qs('#tab-palpite');
+const tabCashbacksEl  = qs('#tab-cashbacks'); // ✅ NOVO
 
 const tbodyBancas     = qs('#tblBancas tbody');
 const tbodyPags       = qs('#tblPagamentos tbody');
@@ -467,8 +468,6 @@ async function loadCupons(){
   return STATE.cupons;
 }
 
-
-
 async function render(){
   if (TAB === 'bancas') {
     tabBancasEl?.classList.add('show');
@@ -476,7 +475,8 @@ async function render(){
     tabExtratosEl?.classList.remove('show');
     tabCuponsEl?.classList.remove('show');
     tabSorteioEl?.classList.remove('show');
-    tabPalpiteEl?.classList.remove('show'); 
+    tabPalpiteEl?.classList.remove('show');
+    tabCashbacksEl?.classList.remove('show'); 
     renderBancas();
     updateTotals();
 
@@ -486,7 +486,8 @@ async function render(){
     tabExtratosEl?.classList.remove('show');
     tabCuponsEl?.classList.remove('show');
     tabSorteioEl?.classList.remove('show');
-    tabPalpiteEl?.classList.remove('show'); 
+    tabPalpiteEl?.classList.remove('show');
+    tabCashbacksEl?.classList.remove('show'); 
     renderPagamentos();
 
   } else if (TAB === 'extratos') {
@@ -495,7 +496,8 @@ async function render(){
     tabPagamentosEl?.classList.remove('show');
     tabCuponsEl?.classList.remove('show');
     tabSorteioEl?.classList.remove('show');
-    tabPalpiteEl?.classList.remove('show'); 
+    tabPalpiteEl?.classList.remove('show');
+    tabCashbacksEl?.classList.remove('show'); 
     renderExtratos();
 
   } else if (TAB === 'cupons') {
@@ -504,7 +506,8 @@ async function render(){
     tabPagamentosEl?.classList.remove('show');
     tabExtratosEl?.classList.remove('show');
     tabSorteioEl?.classList.remove('show');
-    tabPalpiteEl?.classList.remove('show'); 
+    tabPalpiteEl?.classList.remove('show');
+    tabCashbacksEl?.classList.remove('show'); 
     renderCupons();
 
   } else if (TAB === 'sorteio') {
@@ -513,17 +516,32 @@ async function render(){
     tabPagamentosEl?.classList.remove('show');
     tabExtratosEl?.classList.remove('show');
     tabCuponsEl?.classList.remove('show');
-    tabPalpiteEl?.classList.remove('show'); 
+    tabPalpiteEl?.classList.remove('show');
+    tabCashbacksEl?.classList.remove('show'); 
 
-  } else if (TAB === 'palpite') {
-    tabPalpiteEl?.classList.add('show'); 
+  } else if (TAB === 'cashbacks') { 
+    tabCashbacksEl?.classList.add('show');
+
     tabBancasEl?.classList.remove('show');
     tabPagamentosEl?.classList.remove('show');
     tabExtratosEl?.classList.remove('show');
     tabCuponsEl?.classList.remove('show');
     tabSorteioEl?.classList.remove('show');
+    tabPalpiteEl?.classList.remove('show');
 
-    
+    if (window.CashbackAdmin && typeof window.CashbackAdmin.onTabShown === 'function') {
+      try { window.CashbackAdmin.onTabShown(); } catch(e){ console.error(e); }
+    }
+
+  } else if (TAB === 'palpite') {
+    tabPalpiteEl?.classList.add('show');
+    tabBancasEl?.classList.remove('show');
+    tabPagamentosEl?.classList.remove('show');
+    tabExtratosEl?.classList.remove('show');
+    tabCuponsEl?.classList.remove('show');
+    tabSorteioEl?.classList.remove('show');
+    tabCashbacksEl?.classList.remove('show'); 
+
     if (window.PalpiteAdmin && typeof window.PalpiteAdmin.onTabShown === 'function') {
       try { window.PalpiteAdmin.onTabShown(); } catch(e){ console.error(e); }
     }
@@ -733,9 +751,12 @@ async function refresh(){
   } else if (TAB==='cupons'){
     await loadCupons();
   } else if (TAB==='sorteio') {
-    
+    // (sorteio usa seu próprio JS)
+  } else if (TAB==='cashbacks') { // ✅ NOVO
+    if (window.CashbackAdmin && typeof window.CashbackAdmin.refresh === 'function') {
+      try { await window.CashbackAdmin.refresh(); } catch(e){ console.error(e); }
+    }
   } else if (TAB==='palpite') {
-    
     if (window.PalpiteAdmin && typeof window.PalpiteAdmin.refresh === 'function') {
       try { await window.PalpiteAdmin.refresh(); } catch(e){ console.error(e); }
     }
@@ -1642,10 +1663,23 @@ function startStream(){
     if (TAB === 'cupons') renderCupons();
   }, 200);
 
+ 
+  const softRefreshCashbacks = debounce(async () => {
+    if (window.CashbackAdmin && typeof window.CashbackAdmin.refresh === 'function') {
+      try {
+        await window.CashbackAdmin.refresh();
+        if (TAB === 'cashbacks' && typeof window.CashbackAdmin.render === 'function') {
+          window.CashbackAdmin.render();
+        }
+      } catch(e){ console.error(e); }
+    }
+  }, 200);
+
   es.addEventListener('bancas-changed',     softRefreshBancas);
   es.addEventListener('pagamentos-changed', softRefreshPags);
   es.addEventListener('extratos-changed',   softRefreshExt);
   es.addEventListener('cupons-changed',     softRefreshCupons);
+  es.addEventListener('cashbacks-changed',  softRefreshCashbacks);
   es.addEventListener('ping', () => {});
 
   es.onerror = () => {
@@ -1729,9 +1763,13 @@ document.addEventListener('DOMContentLoaded', async ()=>{
     totalBanEl.addEventListener('click', ()=> showTotaisPopup('bancas', totalBanEl));
   }
 
-  
   if (window.PalpiteAdmin && typeof window.PalpiteAdmin.init === 'function') {
     try { window.PalpiteAdmin.init(); } catch(e){ console.error(e); }
+  }
+
+ 
+  if (window.CashbackAdmin && typeof window.CashbackAdmin.init === 'function') {
+    try { window.CashbackAdmin.init(); } catch(e){ console.error(e); }
   }
 
   startStream();

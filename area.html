@@ -11,8 +11,9 @@
 
   <link rel="stylesheet" href="assets/css/area.css">
   <link rel="stylesheet" href="assets/css/sorteio.css">
-
   <link rel="stylesheet" href="assets/css/palpite.css">
+
+  <link rel="stylesheet" href="assets/css/cashback.css">
 </head>
 <body>
 
@@ -22,7 +23,7 @@
       <img src="assets/img/banner.png" alt="Banquinhas" class="hero-logo">
       <div>
         <h1 class="hero-title">Banquinhas</h1>
-        <p class="hero-sub">Gestão de Bancas, Pagamentos, Extratos, Cupons e Sorteio</p>
+        <p class="hero-sub">Gestão de Bancas, Pagamentos, Extratos, Cupons, Sorteio, Palpites e Cashbacks</p>
       </div>
     </div>
   </header>
@@ -40,9 +41,8 @@
         <button class="nav-btn" data-tab="pagamentos">Pagamentos</button>
         <button class="nav-btn" data-tab="cupons">Cupons</button>
         <button class="nav-btn" data-tab="sorteio">Sorteio</button>
-
         <button class="nav-btn" data-tab="palpite">Palpites</button>
-
+        <button class="nav-btn" data-tab="cashbacks">Cashbacks</button>
         <button class="nav-btn" data-tab="extratos">Extratos</button>
 
         <button id="logoutBtn" class="btn btn--ghost" style="margin-left:auto">
@@ -314,8 +314,6 @@
               <p class="muted" style="margin:6px 0 0">
                 Chat: <code>!p 231</code> (somente valor)
               </p>
-
-              
             </div>
 
             <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -366,6 +364,115 @@
         </div>
       </div>
 
+      <div class="tab tab-view" id="tab-cashbacks">
+        <div class="card" style="margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start">
+            <div>
+              <h2 style="margin:0">💸 Cashbacks</h2>
+              <p class="muted" style="margin:6px 0 0">
+                Público: <code>/cashback-publico.html</code> • Chat: <code>!cashback</code> • Status: <code>!status</code>
+              </p>
+            </div>
+
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn--primary" id="btnCashbackRefresh">Atualizar</button>
+              <button class="btn btn--ghost" id="btnCashbackCopyLink">Copiar link</button>
+              <button class="btn btn--danger" id="btnCashbackClearFilters">Limpar filtros</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:12px">
+          <div style="display:grid;grid-template-columns:1.2fr 0.8fr 0.8fr 0.6fr;gap:10px;align-items:end">
+            <div>
+              <label class="muted" for="cashbackSearch">Buscar</label>
+              <input id="cashbackSearch" class="input" type="text" placeholder="Buscar por nick…">
+            </div>
+
+            <div>
+              <label class="muted" for="cashbackStatus">Status</label>
+              <select id="cashbackStatus" class="input">
+                <option value="all" selected>Todos</option>
+                <option value="PENDENTE">Pendente</option>
+                <option value="APROVADO">Aprovado</option>
+                <option value="REPROVADO">Reprovado</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="muted" for="cashbackRange">Período</label>
+              <select id="cashbackRange" class="input">
+                <option value="last7">Últimos 7 dias</option>
+                <option value="last30" selected>Últimos 30 dias</option>
+                <option value="today">Hoje</option>
+                <option value="custom">Intervalo personalizado</option>
+              </select>
+            </div>
+
+            <div style="display:flex;gap:10px">
+              <div style="flex:1">
+                <label class="muted" for="cashbackFrom">De</label>
+                <input id="cashbackFrom" type="date" class="input" disabled>
+              </div>
+              <div style="flex:1">
+                <label class="muted" for="cashbackTo">Até</label>
+                <input id="cashbackTo" type="date" class="input" disabled>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+            <div class="totais" style="gap:10px;flex-wrap:wrap">
+              <button type="button" class="totais-pill" id="cashbackTotalPendentes">Pendentes: —</button>
+              <button type="button" class="totais-pill" id="cashbackTotalAprovados">Aprovados: —</button>
+              <button type="button" class="totais-pill" id="cashbackTotalReprovados">Reprovados: —</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="cashback-grid">
+          <div class="card cashback-main">
+            <div class="table-wrap">
+              <table class="table" id="tblCashbacks" aria-label="Tabela de Cashbacks">
+                <thead>
+                  <tr>
+                    <th>Data</th>
+                    <th>Nick Twitch</th>
+                    <th>Status</th>
+                    <th>Detalhe</th>
+                    <th class="col-acoes">Ações</th>
+                  </tr>
+                </thead>
+                <tbody id="tbodyCashbacks"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card cashback-side">
+            <h3 style="margin-top:0">🏆 Ranking (Aprovados)</h3>
+            <p class="muted" style="margin:6px 0 12px">Cada aprovação soma +1 ponto para o usuário.</p>
+
+            <div class="table-wrap">
+              <table class="table" id="tblCashbackRanking" aria-label="Ranking de Cashbacks">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Usuário</th>
+                    <th>Pontos</th>
+                  </tr>
+                </thead>
+                <tbody id="tbodyCashbackRanking"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <p class="sorteio-tip" style="margin-top:12px">
+          Formulário público:
+          <code id="cashbackPublicUrl">https://banca-livre.onrender.com/cashback-publico.html</code>
+        </p>
+      </div>
+
     </section>
   </main>
 
@@ -394,6 +501,8 @@
   <script src="assets/js/area.js" defer></script>
   <script src="assets/js/sorteio.js" defer></script>
   <script src="assets/js/palpite-admin.js" defer></script>
+
+  <script src="assets/js/cashback-admin.js" defer></script>
 
 </body>
 </html>
