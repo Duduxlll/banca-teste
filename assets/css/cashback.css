@@ -420,3 +420,62 @@ dialog.cb-modal::backdrop{
 #tab-cashbacks #cbRankTbl tbody td:last-child{
   border-right: 0 !important;
 }
+
+
+
+dialog.cb-modal.cb-proof .cb-modal-card{
+  width: min(96vw, 860px);
+}
+
+dialog.cb-modal.cb-proof .cb-proof-body{
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(0,0,0,.25);
+}
+
+dialog.cb-modal.cb-proof #cbPImg{
+  width: 100%;
+  height: auto;
+  max-height: 65vh;
+  display: block;
+  border-radius: 14px;
+  cursor: zoom-in;
+  transition: transform .18s ease, max-height .18s ease;
+  object-fit: contain;
+}
+
+dialog.cb-modal.cb-proof .cb-proof-hint{
+  margin-top: 10px;
+  font-size: .85rem;
+  opacity: .75;
+}
+
+
+dialog.cb-modal.cb-proof.is-zoom .cb-modal-card{
+  width: min(98vw, 1200px);
+}
+
+dialog.cb-modal.cb-proof.is-zoom #cbPImg{
+  max-height: 82vh;
+  cursor: zoom-out;
+}
+
+
+.cb-x{
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid rgba(46, 204, 113, .35);
+  background: rgba(255,255,255,.06);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.cb-x:hover{
+  background: rgba(46, 204, 113, .12);
+}
