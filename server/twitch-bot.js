@@ -139,7 +139,7 @@ export function initTwitchBot({
 
       if (cmd.type === "cashback") {
         const mention = userTag ? `@${userTag}` : `@${user}`;
-        await say(`${mention} cashback: envie o print (cadastro + depósito) 👉 ${publicUrl} • depois !status`);
+        await say(`${mention} Cadastre-se na !melbet !borawin e envie o print do cadastro/depósito ${publicUrl} • Pra ver se foi aprovado: !status`);
         return;
       }
 
@@ -147,7 +147,7 @@ export function initTwitchBot({
         const mention = userTag ? `@${userTag}` : `@${user}`;
         const st = await getCashbackStatus(userTag || user);
         if (st.notFound) {
-          await say(`${mention} você ainda não tem pedido. Use !cashback`);
+          await say(`${mention} você ainda não pediu seu cashback. Use !cashback`);
           return;
         }
         if (st.error) {
