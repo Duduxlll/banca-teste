@@ -388,3 +388,35 @@ dialog.cb-modal::backdrop{
 #tab-cashbacks .table tbody td:last-child{
   border-right:0 !important;
 }
+
+
+#tab-cashbacks{
+  --cb-sep: rgba(0,255,150,.06);        
+  --cb-sep-strong: rgba(0,255,150,.09); 
+}
+
+
+#tab-cashbacks #cbTbl thead th,
+#tab-cashbacks #cbTbl tbody td,
+#tab-cashbacks #cbRankTbl thead th,
+#tab-cashbacks #cbRankTbl tbody td{
+  border-left: 0 !important;                 
+  border-right: 1px solid var(--cb-sep) !important;
+  box-shadow: none !important;               
+  outline: 0 !important;
+  background-image: none !important;
+  background-clip: padding-box !important;   
+}
+
+
+#tab-cashbacks #cbTbl thead th,
+#tab-cashbacks #cbRankTbl thead th{
+  border-right-color: var(--cb-sep-strong) !important;
+}
+
+#tab-cashbacks #cbTbl thead th:last-child,
+#tab-cashbacks #cbTbl tbody td:last-child,
+#tab-cashbacks #cbRankTbl thead th:last-child,
+#tab-cashbacks #cbRankTbl tbody td:last-child{
+  border-right: 0 !important;
+}
