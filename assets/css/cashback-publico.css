@@ -321,3 +321,13 @@ input:focus,select:focus,textarea:focus{
   .actions{gap:10px}
   .hint{font-size:.9rem}
 }
+
+/* === REMOVE AS MANCHAS (BLOBS) EM TODAS AS TELAS === */
+.bg,
+.blob{
+  display: none !important;
+}
+
+body{
+  background: #070a0b !important;
+}
