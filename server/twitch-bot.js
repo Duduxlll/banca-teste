@@ -12,14 +12,22 @@ export function initTwitchBot({
 }) {
   const log = onLog || console;
 
+  if (globalThis.__TWITCH_BOT_SINGLETON__) {
+    return globalThis.__TWITCH_BOT_SINGLETON__;
+  }
+
   if (!enabled) {
     log.log("[twitch-bot] desativado por config.");
-    return { enabled: false, say: async () => {}, client: null };
+    const api = { enabled: false, say: async () => {}, client: null };
+    globalThis.__TWITCH_BOT_SINGLETON__ = api;
+    return api;
   }
 
   if (!port || !apiKey || !botUsername || !oauthToken || !channel) {
     log.log("[twitch-bot] faltam envs (TWITCH_* e APP_PUBLIC_KEY). Bot não iniciado.");
-    return { enabled: false, say: async () => {}, client: null };
+    const api = { enabled: false, say: async () => {}, client: null };
+    globalThis.__TWITCH_BOT_SINGLETON__ = api;
+    return api;
   }
 
   const tmi = tmiPkg?.default ?? tmiPkg;
@@ -81,6 +89,28 @@ export function initTwitchBot({
     return { ok: true, data };
   }
 
+  async function say(msg) {
+    try {
+      await client.say(chan, msg);
+    } catch (e) {
+      log.error("[twitch-bot] falha ao enviar msg:", e);
+    }
+  }
+
+  const recent = new Map();
+  function isDuplicate(userKey, cmdKey) {
+    const key = `${userKey}|${cmdKey}`;
+    const now = Date.now();
+    const last = recent.get(key) || 0;
+    if (now - last < 1500) return true;
+    recent.set(key, now);
+    if (recent.size > 500) {
+      const cutoff = now - 60000;
+      for (const [k, t] of recent.entries()) if (t < cutoff) recent.delete(k);
+    }
+    return false;
+  }
+
   client.on("connected", () => {
     log.log(`[twitch-bot] conectado em ${chan} como ${botUsername}`);
   });
@@ -96,6 +126,11 @@ export function initTwitchBot({
     const cmd = parseCommand(message);
     if (!cmd) return;
 
+    const userKey = userTag || user;
+    const cmdKey = cmd.type === "guess" ? `guess:${cmd.payload || ""}` : cmd.type;
+
+    if (isDuplicate(userKey, cmdKey)) return;
+
     enqueue(async () => {
       if (cmd.type === "guess") {
         await submitGuessToServer(user, cmd.payload);
@@ -104,18 +139,19 @@ export function initTwitchBot({
 
       if (cmd.type === "cashback") {
         const mention = userTag ? `@${userTag}` : `@${user}`;
-        await say(`${mention} envie seu cashback aqui 👉 ${publicUrl} (nick + pix + print do comprovante). Depois use !status pra acompanhar.`);
+        await say(`${mention} cashback: envie o print (cadastro + depósito) 👉 ${publicUrl} • depois !status`);
         return;
       }
 
       if (cmd.type === "status") {
+        const mention = userTag ? `@${userTag}` : `@${user}`;
         const st = await getCashbackStatus(userTag || user);
         if (st.notFound) {
-          await say(`@${userTag || user} você ainda não tem pedido. Use !cashback`);
+          await say(`${mention} você ainda não tem pedido. Use !cashback`);
           return;
         }
         if (st.error) {
-          await say(`@${userTag || user} não consegui consultar agora. Tenta de novo já já.`);
+          await say(`${mention} não consegui consultar agora. Tenta de novo já já.`);
           return;
         }
 
@@ -124,11 +160,11 @@ export function initTwitchBot({
         const prazo = String(st.data?.payoutWindow || "").trim();
 
         if (s === "APROVADO") {
-          await say(`@${userTag || user} APROVADO ✅ ${prazo ? `• ${prazo}` : ""}`.trim());
+          await say(`${mention} APROVADO ✅${prazo ? ` • ${prazo}` : ""}`.trim());
         } else if (s === "REPROVADO") {
-          await say(`@${userTag || user} REPROVADO ❌ ${reason ? `• ${reason}` : ""}`.trim());
+          await say(`${mention} REPROVADO ❌${reason ? ` • ${reason}` : ""}`.trim());
         } else {
-          await say(`@${userTag || user} PENDENTE ⏳ Aguarde a análise.`);
+          await say(`${mention} PENDENTE ⏳ aguarde a análise.`);
         }
         return;
       }
@@ -137,13 +173,8 @@ export function initTwitchBot({
 
   client.connect().catch((e) => log.error("[twitch-bot] falha ao conectar:", e));
 
-  async function say(msg) {
-    try {
-      await client.say(chan, msg);
-    } catch (e) {
-      log.error("[twitch-bot] falha ao enviar msg:", e);
-    }
-  }
+  const api = { enabled: true, say, client };
+  globalThis.__TWITCH_BOT_SINGLETON__ = api;
 
-  return { enabled: true, say, client };
+  return api;
 }
