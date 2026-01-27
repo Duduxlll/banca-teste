@@ -422,7 +422,10 @@ app.use('/api', (req, res, next) => {
     '/api/cashbacks/status',
     '/api/cashback/submit',
     '/api/cashback/status',
-    '/api/cashback/ranking'
+    '/api/cashback/ranking',
+    '/api/torneio/state',
+    '/api/torneio/join'
+
   ];
 
   if (openRoutes.some(r => req.path.startsWith(r.replace('/api','')))) {
@@ -2123,6 +2126,16 @@ async function ensureCashbacksTable(){
 let twitchBot = { enabled: false, say: async () => {} };
 
 app.listen(PORT, async () => {
+
+  try { await q("select 1"); } catch (e) { console.error("PG caiu:", e); }
+
+  try { await ensureTorneioTables(q); console.log("✅ torneio tables ok"); }
+  catch (e) { console.error("❌ torneio tables fail:", e); }
+
+  try { await ensureCashbackTables(q); console.log("✅ cashback tables ok"); }
+  catch (e) { console.error("❌ cashback tables fail:", e); }
+
+  
   try{
     await q('select 1');
     await ensureMessageColumns();
