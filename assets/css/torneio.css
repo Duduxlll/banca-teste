@@ -1,0 +1,24 @@
+.tr-root{display:block}
+.tr-head{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start}
+.tr-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.tr-line{margin-top:10px;padding:10px 12px;border-radius:12px;border:1px solid rgba(34,224,122,.18);background:rgba(255,255,255,.04);color:#dfffee}
+.tr-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.tr-grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.tr-form{display:grid;gap:8px}
+.tr-card{overflow:hidden}
+.tr-card-head{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:12px;border-bottom:1px solid rgba(34,224,122,.14)}
+.tr-card-title{font-weight:900;letter-spacing:.2px}
+.tr-card-sub{margin-top:4px}
+.tr-chip{display:inline-flex;align-items:center;justify-content:center;min-width:34px;padding:4px 10px;border-radius:999px;border:1px solid rgba(34,224,122,.25);background:rgba(34,224,122,.10);color:#dfffee;font-weight:900;font-size:.85rem}
+.tr-list{max-height:360px;overflow:auto;padding:8px}
+.tr-item{display:flex;justify-content:space-between;gap:10px;padding:10px;border-radius:12px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);margin-bottom:8px}
+.tr-item span{opacity:.9}
+.tr-item strong{color:#fff}
+.tr-winners{padding:12px}
+.tr-winner-line{display:flex;flex-wrap:wrap;gap:8px}
+.tr-pill{display:inline-flex;align-items:center;gap:8px;padding:8px 10px;border-radius:999px;border:1px solid rgba(34,224,122,.26);background:rgba(34,224,122,.10);color:#eafff4;font-weight:800}
+@media (max-width: 980px){
+  .tr-grid{grid-template-columns:minmax(0,1fr)}
+  .tr-grid2{grid-template-columns:minmax(0,1fr)}
+  .tr-list{max-height:280px}
+}

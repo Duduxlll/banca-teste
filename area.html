@@ -12,8 +12,8 @@
   <link rel="stylesheet" href="assets/css/area.css">
   <link rel="stylesheet" href="assets/css/sorteio.css">
   <link rel="stylesheet" href="assets/css/palpite.css">
-
   <link rel="stylesheet" href="assets/css/cashback.css">
+  <link rel="stylesheet" href="assets/css/torneio.css">
 </head>
 <body>
 
@@ -23,7 +23,7 @@
       <img src="assets/img/banner.png" alt="Banquinhas" class="hero-logo">
       <div>
         <h1 class="hero-title">Banquinhas</h1>
-        <p class="hero-sub">Gestão de Bancas, Pagamentos, Extratos, Cupons, Sorteio, Palpites e Cashbacks</p>
+        <p class="hero-sub">Gestão de Bancas, Pagamentos, Extratos, Cupons, Sorteio, Palpites, Torneios e Cashbacks</p>
       </div>
     </div>
   </header>
@@ -42,6 +42,7 @@
         <button class="nav-btn" data-tab="cupons">Cupons</button>
         <button class="nav-btn" data-tab="sorteio">Sorteio</button>
         <button class="nav-btn" data-tab="palpite">Palpites</button>
+        <button class="nav-btn" data-tab="torneio">Torneio</button>
         <button class="nav-btn" data-tab="cashbacks">Cashbacks</button>
         <button class="nav-btn" data-tab="extratos">Extratos</button>
 
@@ -364,6 +365,136 @@
         </div>
       </div>
 
+      <div class="tab tab-view" id="tab-torneio">
+        <div class="card" style="margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start">
+            <div>
+              <h2 style="margin:0">🏟️ Torneio (Times)</h2>
+              <p class="muted" style="margin:6px 0 0">
+                Chat: <code>!time A</code> <code>!time B</code> <code>!time C</code>
+              </p>
+            </div>
+
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn--primary" id="btnTorneioRefresh">Atualizar</button>
+              <button class="btn btn--ghost" id="btnTorneioCopyCmd">Copiar comandos</button>
+              <button class="btn btn--danger" id="btnTorneioReset">Encerrar / Reset</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:12px">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;align-items:end">
+            <div>
+              <label class="muted" for="torNome">Nome do torneio</label>
+              <input id="torNome" class="input" type="text" placeholder="Ex: Torneio do Guigz">
+            </div>
+
+            <div>
+              <label class="muted" for="torFase">Fase atual</label>
+              <input id="torFase" class="input" type="number" min="1" step="1" value="1">
+            </div>
+
+            <div>
+              <label class="muted" for="torEstado">Status</label>
+              <input id="torEstado" class="input" type="text" value="—" readonly>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:10px">
+            <div>
+              <label class="muted" for="torTeamA">Time A (nome)</label>
+              <input id="torTeamA" class="input" type="text" placeholder="Ex: Time Verde">
+            </div>
+            <div>
+              <label class="muted" for="torTeamB">Time B (nome)</label>
+              <input id="torTeamB" class="input" type="text" placeholder="Ex: Time Preto">
+            </div>
+            <div>
+              <label class="muted" for="torTeamC">Time C (nome)</label>
+              <input id="torTeamC" class="input" type="text" placeholder="Ex: Time Neon">
+            </div>
+          </div>
+
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+            <button class="btn btn--primary" id="btnTorneioAbrir">Abrir entradas</button>
+            <button class="btn btn--ghost" id="btnTorneioFechar">Fechar entradas</button>
+
+            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-left:auto" id="torCounts">
+              <button type="button" class="totais-pill" id="torCountA">A: —</button>
+              <button type="button" class="totais-pill" id="torCountB">B: —</button>
+              <button type="button" class="totais-pill" id="torCountC">C: —</button>
+              <button type="button" class="totais-pill" id="torCountTotal">Total: —</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:end">
+            <div style="flex:1;min-width:220px">
+              <label class="muted" for="torWinner">Time vencedor da fase</label>
+              <select id="torWinner" class="input">
+                <option value="A">A</option>
+                <option value="B">B</option>
+                <option value="C">C</option>
+              </select>
+            </div>
+
+            <button class="btn btn--primary" id="btnTorneioVencedor">Confirmar vencedor</button>
+          </div>
+
+          <p class="muted" style="margin:10px 0 0">
+            Ao confirmar, somente os usuários do time vencedor ficam classificados para a próxima fase.
+          </p>
+        </div>
+
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px">
+            <div style="flex:1;min-width:240px">
+              <label class="muted" for="torSearch">Buscar participante</label>
+              <input id="torSearch" class="input" type="text" placeholder="Buscar por nick…">
+            </div>
+
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <div>
+                <label class="muted" for="torFiltroTime">Time</label>
+                <select id="torFiltroTime" class="input">
+                  <option value="ALL" selected>Todos</option>
+                  <option value="A">A</option>
+                  <option value="B">B</option>
+                  <option value="C">C</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="muted" for="torFiltroStatus">Status</label>
+                <select id="torFiltroStatus" class="input">
+                  <option value="ALL" selected>Todos</option>
+                  <option value="CLASSIFICADO">Classificados</option>
+                  <option value="ELIMINADO">Eliminados</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table class="table" id="tblTorneio" aria-label="Tabela do Torneio">
+              <thead>
+                <tr>
+                  <th>Nick Twitch</th>
+                  <th>Fase</th>
+                  <th>Time</th>
+                  <th>Status</th>
+                  <th>Data</th>
+                  <th class="col-acoes">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="tbodyTorneio"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <div class="tab tab-view" id="tab-cashbacks">
         <div class="card" style="margin-bottom:12px">
           <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start">
@@ -501,7 +632,7 @@
   <script src="assets/js/area.js" defer></script>
   <script src="assets/js/sorteio.js" defer></script>
   <script src="assets/js/palpite-admin.js" defer></script>
-
+  <script src="assets/js/torneio-admin.js" defer></script>
   <script src="assets/js/cashback-admin.js" defer></script>
 
 </body>

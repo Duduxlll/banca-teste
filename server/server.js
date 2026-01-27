@@ -14,6 +14,8 @@ import crypto from 'crypto';
 import axios from 'axios';
 import QRCode from 'qrcode';
 import pkg from 'pg';
+import { ensureTorneioTables, registerTorneioRoutes } from "./torneio-routes.js";
+
 import { ensureCashbackTables, registerCashbackRoutes } from './cashback-routes.js';
 
 import { initTwitchBot } from "./twitch-bot.js";
@@ -1332,6 +1334,7 @@ app.patch('/api/cashbacks/:id', requireAdmin, async (req, res) => {
   }
 });
 
+registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin, sseSendAll });
 
 
 registerCashbackRoutes({
@@ -2128,6 +2131,7 @@ app.listen(PORT, async () => {
     await ensurePalpiteTables();
     await palpiteLoadFromDB();
     await ensureCashbackTables(q);
+    await ensureTorneioTables(q);
 
 
     console.log('🗄️  Postgres conectado');

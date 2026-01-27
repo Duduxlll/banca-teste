@@ -8,7 +8,7 @@ export function initTwitchBot({
   channel,
   enabled = true,
   onLog = console,
-  cashbackPublicUrl
+  cashbackPublicUrl,
 }) {
   const log = onLog || console;
 
@@ -59,8 +59,10 @@ export function initTwitchBot({
     if (m && m[1]) return { type: "guess", payload: m[1].trim() };
 
     if (/^!cashback\b/i.test(text)) return { type: "cashback" };
-
     if (/^!status\b/i.test(text)) return { type: "status" };
+
+    const t = text.match(/^!time\b\s*([abc])\b/i);
+    if (t) return { type: "time", payload: t[1].toUpperCase() };
 
     return null;
   }
@@ -77,13 +79,33 @@ export function initTwitchBot({
     return res.ok;
   }
 
+  async function joinTeam(userTag, displayName, team) {
+    const url = `http://127.0.0.1:${port}/api/torneio/join?key=${encodeURIComponent(apiKey)}`;
+
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ user: userTag, displayName, team }),
+    });
+
+    let data = null;
+    try {
+      data = await res.json();
+    } catch {}
+
+    if (!res.ok) return { error: data?.error || `http_${res.status}` };
+    return { ok: true, data };
+  }
+
   async function getCashbackStatus(user) {
     const url = `http://127.0.0.1:${port}/api/cashback/status/${encodeURIComponent(user)}?key=${encodeURIComponent(apiKey)}`;
     const res = await fetch(url, { method: "GET", headers: { Accept: "application/json" } });
 
     if (res.status === 404) return { notFound: true };
     let data = null;
-    try { data = await res.json(); } catch {}
+    try {
+      data = await res.json();
+    } catch {}
     if (!res.ok) return { error: data?.error || `http_${res.status}` };
 
     return { ok: true, data };
@@ -104,6 +126,7 @@ export function initTwitchBot({
     const last = recent.get(key) || 0;
     if (now - last < 1500) return true;
     recent.set(key, now);
+
     if (recent.size > 500) {
       const cutoff = now - 60000;
       for (const [k, t] of recent.entries()) if (t < cutoff) recent.delete(k);
@@ -127,7 +150,12 @@ export function initTwitchBot({
     if (!cmd) return;
 
     const userKey = userTag || user;
-    const cmdKey = cmd.type === "guess" ? `guess:${cmd.payload || ""}` : cmd.type;
+    const cmdKey =
+      cmd.type === "guess"
+        ? `guess:${cmd.payload || ""}`
+        : cmd.type === "time"
+          ? `time:${cmd.payload || ""}`
+          : cmd.type;
 
     if (isDuplicate(userKey, cmdKey)) return;
 
@@ -137,9 +165,35 @@ export function initTwitchBot({
         return;
       }
 
+      if (cmd.type === "time") {
+        const mention = userTag ? `@${userTag}` : `@${user}`;
+
+        const r = await joinTeam(userTag || user, display || user, cmd.payload);
+        if (r.error === "torneio_inativo") {
+          await say(`${mention} torneio não está ativo agora.`);
+          return;
+        }
+        if (r.error === "fase_fechada") {
+          await say(`${mention} entradas fechadas.`);
+          return;
+        }
+        if (r.error === "nao_classificado") {
+          await say(`${mention} você não está classificado para esta fase.`);
+          return;
+        }
+        if (r.error) {
+          await say(`${mention} não consegui entrar agora. Tenta de novo já já.`);
+          return;
+        }
+
+        const teamName = r.data?.teamName ? ` (${r.data.teamName})` : "";
+        await say(`${mention} você entrou no time ${cmd.payload}${teamName}.`);
+        return;
+      }
+
       if (cmd.type === "cashback") {
         const mention = userTag ? `@${userTag}` : `@${user}`;
-        await say(`${mention} Cadastre-se na !melbet ou !borawin e envie o print do cadastro/depósito ${publicUrl} • Pra ver se foi aprovado: !status`);
+        await say(`${mention} envie o print do cadastro/depósito 👉 ${publicUrl} • depois use !status`);
         return;
       }
 
