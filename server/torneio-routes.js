@@ -128,7 +128,7 @@ async function getCounts(q, torneioId, phaseNumber) {
      GROUP BY team`,
     [torneioId, phaseNumber]
   );
-  const m = new Map(rows.map(r => [String(r.team), Number(r.c) || 0]));
+  const m = new Map((rows || []).map((r) => [String(r.team || "").toUpperCase(), Number(r.c) || 0]));
   return { A: m.get("A") || 0, B: m.get("B") || 0, C: m.get("C") || 0 };
 }
 
@@ -147,7 +147,7 @@ async function getTeamLists(q, torneioId, phaseNumber) {
   );
 
   const out = { A: [], B: [], C: [] };
-  for (const r of rows) {
+  for (const r of rows || []) {
     const t = String(r.team || "").toUpperCase();
     if (!out[t]) continue;
     out[t].push({ twitchName: r.twitchName, displayName: r.displayName });
@@ -216,6 +216,13 @@ async function eliminateNotInWinner(q, torneioId, phaseNumber, winnerTeam) {
 }
 
 export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin, sseSendAll }) {
+  let ensured = false;
+  async function ensureReady() {
+    if (ensured) return;
+    await ensureTorneioTables(q);
+    ensured = true;
+  }
+
   const joinLimiter = rateLimit({
     windowMs: 15 * 1000,
     max: 6,
@@ -226,6 +233,8 @@ export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin
 
   app.get("/api/torneio/state", requireAppKey, async (req, res) => {
     try {
+      await ensureReady();
+
       const tor = await getActiveTorneio(q);
       if (!tor) return res.json({ ok: true, active: false });
 
@@ -243,16 +252,19 @@ export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin
           status: ph.status,
           teams: { A: ph.teamAName, B: ph.teamBName, C: ph.teamCName },
           winnerTeam: ph.winnerTeam || null,
-          counts
-        }
+          counts,
+        },
       });
     } catch (e) {
+      console.error("torneio/state:", e?.message || e);
       return res.status(500).json({ error: "falha_state" });
     }
   });
 
   app.post("/api/torneio/join", requireAppKey, joinLimiter, async (req, res) => {
     try {
+      await ensureReady();
+
       const tor = await getActiveTorneio(q);
       if (!tor) return res.status(400).json({ error: "torneio_inativo" });
 
@@ -291,17 +303,28 @@ export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin
         phase: ph.phaseNumber,
         team,
         teamName: teamNames[team],
-        counts
+        counts,
       });
     } catch (e) {
+      console.error("torneio/join:", e?.message || e);
       return res.status(500).json({ error: "falha_join" });
     }
   });
 
   app.get("/api/torneio/admin/current", requireAdmin, async (req, res) => {
     try {
+      await ensureReady();
+
       const tor = await getActiveTorneio(q);
-      if (!tor) return res.json({ ok: true, active: false });
+      if (!tor) {
+        return res.json({
+          ok: true,
+          active: false,
+          torneio: null,
+          phase: null,
+          alive: [],
+        });
+      }
 
       const ph = await getPhase(q, tor.id, tor.currentPhase);
       const counts = ph ? await getCounts(q, tor.id, ph.phaseNumber) : { A: 0, B: 0, C: 0 };
@@ -327,18 +350,21 @@ export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin
               teams: { A: ph.teamAName, B: ph.teamBName, C: ph.teamCName },
               winnerTeam: ph.winnerTeam || null,
               counts,
-              lists
+              lists,
             }
           : null,
-        alive: aliveRows
+        alive: aliveRows || [],
       });
     } catch (e) {
+      console.error("torneio/admin/current:", e?.message || e);
       return res.status(500).json({ error: "falha_current" });
     }
   });
 
   app.post("/api/torneio/admin/start", requireAdmin, async (req, res) => {
     try {
+      await ensureReady();
+
       const exists = await getActiveTorneio(q);
       if (exists) return res.status(400).json({ error: "ja_ativo" });
 
@@ -368,37 +394,42 @@ export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin
 
       return res.json({ ok: true, torneioId });
     } catch (e) {
+      console.error("torneio/admin/start:", e?.message || e);
       return res.status(500).json({ error: "falha_start" });
     }
   });
 
   app.post("/api/torneio/admin/close", requireAdmin, async (req, res) => {
     try {
+      await ensureReady();
+
       const tor = await getActiveTorneio(q);
       if (!tor) return res.status(400).json({ error: "torneio_inativo" });
 
       const ph = await getPhase(q, tor.id, tor.currentPhase);
       if (!ph) return res.status(400).json({ error: "fase_invalida" });
 
-      if (String(ph.status) === P_STATUS.ABERTA) {
-        await q(
-          `UPDATE torneio_phases
-           SET status = $3, closed_at = now()
-           WHERE torneio_id = $1 AND phase_number = $2`,
-          [tor.id, ph.phaseNumber, P_STATUS.FECHADA]
-        );
-      }
+      await q(
+        `UPDATE torneio_phases
+         SET status = $3,
+             closed_at = COALESCE(closed_at, now())
+         WHERE torneio_id = $1 AND phase_number = $2`,
+        [tor.id, ph.phaseNumber, P_STATUS.FECHADA]
+      );
 
       sseSendAll?.("torneio-changed", { reason: "close", torneioId: tor.id, phase: ph.phaseNumber });
 
       return res.json({ ok: true });
     } catch (e) {
+      console.error("torneio/admin/close:", e?.message || e);
       return res.status(500).json({ error: "falha_close" });
     }
   });
 
   app.post("/api/torneio/admin/decide", requireAdmin, async (req, res) => {
     try {
+      await ensureReady();
+
       const tor = await getActiveTorneio(q);
       if (!tor) return res.status(400).json({ error: "torneio_inativo" });
 
@@ -424,12 +455,15 @@ export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin
 
       return res.json({ ok: true });
     } catch (e) {
+      console.error("torneio/admin/decide:", e?.message || e);
       return res.status(500).json({ error: "falha_decide" });
     }
   });
 
   app.post("/api/torneio/admin/open-next", requireAdmin, async (req, res) => {
     try {
+      await ensureReady();
+
       const tor = await getActiveTorneio(q);
       if (!tor) return res.status(400).json({ error: "torneio_inativo" });
 
@@ -443,10 +477,7 @@ export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin
       const teamB = safeText(req.body?.teamB, 40) || "Time B";
       const teamC = safeText(req.body?.teamC, 40) || "Time C";
 
-      await q(
-        `UPDATE torneios SET current_phase = $2 WHERE id = $1`,
-        [tor.id, nextNum]
-      );
+      await q(`UPDATE torneios SET current_phase = $2 WHERE id = $1`, [tor.id, nextNum]);
 
       await q(
         `INSERT INTO torneio_phases
@@ -460,12 +491,15 @@ export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin
 
       return res.json({ ok: true, phase: nextNum });
     } catch (e) {
+      console.error("torneio/admin/open-next:", e?.message || e);
       return res.status(500).json({ error: "falha_open_next" });
     }
   });
 
   app.post("/api/torneio/admin/finish", requireAdmin, async (req, res) => {
     try {
+      await ensureReady();
+
       const tor = await getActiveTorneio(q);
       if (!tor) return res.status(400).json({ error: "torneio_inativo" });
 
@@ -480,12 +514,15 @@ export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin
 
       return res.json({ ok: true });
     } catch (e) {
+      console.error("torneio/admin/finish:", e?.message || e);
       return res.status(500).json({ error: "falha_finish" });
     }
   });
 
   app.get("/api/torneio/admin/winners", requireAdmin, async (req, res) => {
     try {
+      await ensureReady();
+
       const tor = await getActiveTorneio(q);
       if (!tor) return res.json({ ok: true, active: false, rows: [] });
 
@@ -503,8 +540,9 @@ export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin
         [tor.id]
       );
 
-      return res.json({ ok: true, active: true, rows });
+      return res.json({ ok: true, active: true, rows: rows || [] });
     } catch (e) {
+      console.error("torneio/admin/winners:", e?.message || e);
       return res.status(500).json({ error: "falha_winners" });
     }
   });
