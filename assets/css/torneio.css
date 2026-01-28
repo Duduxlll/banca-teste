@@ -285,14 +285,15 @@
 }
 
 #tab-torneio .btn.btn--primary {
-  background: linear-gradient(180deg, rgba(10, 68, 41, 0.28), rgba(5, 151, 78, 0.16));
-  border-color: rgba(120, 190, 255, 0.35);
+  background: linear-gradient(180deg, rgba(120, 255, 190, 0.22), rgba(120, 255, 190, 0.12));
+  border-color: rgba(120, 255, 190, 0.38);
 }
 
 #tab-torneio .btn.btn--primary:hover {
-  background: linear-gradient(180deg, rgba(10, 68, 41, 0.28), rgba(5, 151, 78, 0.16));
-  border-color: rgba(120, 190, 255, 0.45);
+  background: linear-gradient(180deg, rgba(120, 255, 190, 0.28), rgba(120, 255, 190, 0.14));
+  border-color: rgba(120, 255, 190, 0.48);
 }
+
 
 #tab-torneio .btn.btn--danger {
   background: linear-gradient(180deg, rgba(255, 88, 122, 0.22), rgba(255, 88, 122, 0.12));
