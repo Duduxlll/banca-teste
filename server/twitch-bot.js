@@ -17,14 +17,12 @@ export function initTwitchBot({
   }
 
   if (!enabled) {
-    log.log("[twitch-bot] desativado por config.");
     const api = { enabled: false, say: async () => {}, client: null };
     globalThis.__TWITCH_BOT_SINGLETON__ = api;
     return api;
   }
 
   if (!port || !apiKey || !botUsername || !oauthToken || !channel) {
-    log.log("[twitch-bot] faltam envs (TWITCH_* e APP_PUBLIC_KEY). Bot não iniciado.");
     const api = { enabled: false, say: async () => {}, client: null };
     globalThis.__TWITCH_BOT_SINGLETON__ = api;
     return api;
@@ -39,8 +37,7 @@ export function initTwitchBot({
     process.env.CASHBACK_PUBLIC_URL ||
     "https://banca-teste.onrender.com/cashback-publico.html";
 
-  const sayOnJoin =
-    String(process.env.TOURNEY_SAY_JOIN || "").trim().toLowerCase() === "true";
+  const sayOnJoin = String(process.env.TOURNEY_SAY_JOIN || "").trim().toLowerCase() === "true";
 
   const client = new tmi.Client({
     options: { debug: false },
@@ -73,7 +70,11 @@ export function initTwitchBot({
     if (/^!status\b/i.test(text)) return { type: "status" };
 
     const t = text.match(/^!time\b\s*(.+)$/i);
-    if (t) return { type: "time", payload: String(t[1] || "").trim() };
+    if (t) {
+      const payload = String(t[1] || "").trim();
+      if (!payload) return { type: "time", payload: "" };
+      return { type: "time", payload };
+    }
 
     return null;
   }
@@ -220,6 +221,12 @@ export function initTwitchBot({
 
       if (cmd.type === "time") {
         const mention = userTag ? `@${userTag}` : `@${user}`;
+        const rawChoice = String(cmd.payload || "").trim();
+
+        if (!rawChoice) {
+          await say(`${mention} use: !time <nome do time>`);
+          return;
+        }
 
         const st = await getTorneioState();
         if (st.error) {
@@ -244,7 +251,7 @@ export function initTwitchBot({
           return;
         }
 
-        const teamLetter = resolveTeamLetter(cmd.payload, phase.teams);
+        const teamLetter = resolveTeamLetter(rawChoice, phase.teams);
         if (!teamLetter) {
           const a = phase.teams?.A || "A";
           const b = phase.teams?.B || "B";

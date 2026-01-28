@@ -1337,7 +1337,18 @@ app.patch('/api/cashbacks/:id', requireAdmin, async (req, res) => {
   }
 });
 
-registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin, sseSendAll });
+registerTorneioRoutes({
+  app,
+  q,
+  uid,
+  requireAppKey,
+  requireAdmin,
+  sseSendAll,
+  announce: async (msg) => {
+    if (twitchBot?.enabled) await twitchBot.say(msg);
+  }
+});
+
 
 
 registerCashbackRoutes({

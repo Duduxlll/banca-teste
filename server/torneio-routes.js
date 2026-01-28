@@ -95,6 +95,11 @@ function resolveTeamInput(teams, inputRaw) {
   if (up === "B") return getTeamByIndex(teams, 1);
   if (up === "C") return getTeamByIndex(teams, 2);
 
+  const num = parseInt(input.replace(/[^\d]/g, ""), 10);
+  if (Number.isFinite(num) && num >= 1 && num <= (teams?.length || 0)) {
+    return getTeamByIndex(teams, num - 1);
+  }
+
   const k = normalizeTeamKey(input);
   if (!k) return null;
 
@@ -259,7 +264,6 @@ async function getPhase(q, torneioId, phaseNumber) {
 
   const r = rows[0];
   const teams = parseTeamsFromPhaseRow(r);
-
   const points = r.pointsJson && typeof r.pointsJson === "object" ? r.pointsJson : {};
 
   return {
@@ -389,12 +393,80 @@ async function writePhaseTeams(q, torneioId, phaseNumber, teams) {
   );
 }
 
-export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin, sseSendAll }) {
+function buildTeamsList(phase, countsByKey) {
+  const teams = phase?.teams || [];
+  return teams.map((t) => ({
+    key: String(t.key),
+    name: String(t.name),
+    count: countsByKey[String(t.key)] || 0,
+    points: asInt(phase?.points?.[String(t.key)] ?? 0, 0)
+  }));
+}
+
+function buildAnnounceTeamsPreview(teams, maxNames = 8) {
+  const list = (teams || []).map((t) => String(t?.name || "").trim()).filter(Boolean);
+  const shown = list.slice(0, maxNames);
+  const more = list.length - shown.length;
+  const base = shown.join(" | ");
+  return more > 0 ? `${base} (+${more})` : base;
+}
+
+function formatPhaseOpenMsg(torneioName, phaseNumber, teams) {
+  const preview = buildAnnounceTeamsPreview(teams, 8);
+  const t = preview ? ` • Times: ${preview}` : "";
+  return `🏆 ${torneioName} (fase ${phaseNumber} aberta)${t} • Digite: !time <nome do time>`;
+}
+
+function formatPhaseCloseMsg(torneioName, phaseNumber) {
+  return `🏆 ${torneioName} (fase ${phaseNumber} fechada) • Entradas fechadas.`;
+}
+
+function formatPhaseDecideMsg(torneioName, phaseNumber, winnerName) {
+  return `🏆 ${torneioName} (fase ${phaseNumber} decidida) • Vencedor: ${winnerName}`;
+}
+
+function formatFinishMsg(torneioName, winners) {
+  const base = `🏆 ${torneioName} FINALIZADO!`;
+  if (!winners || !winners.length) return base;
+  const tags = winners.map((u) => `@${u}`).join(" ");
+  const msg = `${base} • Ganhadores: ${tags}`;
+  return msg;
+}
+
+function splitTwitchMessages(text, maxLen = 430) {
+  const s = String(text || "").trim();
+  if (s.length <= maxLen) return [s];
+
+  const out = [];
+  let cur = "";
+
+  for (const part of s.split(" ")) {
+    const next = cur ? `${cur} ${part}` : part;
+    if (next.length > maxLen) {
+      if (cur) out.push(cur);
+      cur = part;
+    } else {
+      cur = next;
+    }
+  }
+  if (cur) out.push(cur);
+  return out.slice(0, 5);
+}
+
+export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin, sseSendAll, announce }) {
   let ensured = false;
   async function ensureReady() {
     if (ensured) return;
     await ensureTorneioTables(q);
     ensured = true;
+  }
+
+  async function announceSafe(msg) {
+    try {
+      if (!announce) return;
+      const parts = splitTwitchMessages(msg, 430);
+      for (const p of parts) await announce(p);
+    } catch {}
   }
 
   const joinLimiter = rateLimit({
@@ -415,13 +487,7 @@ export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin
       if (!ph) return res.json({ ok: true, active: true, torneio: tor, phase: null });
 
       const countsByKey = await getCountsByKey(q, tor.id, ph.phaseNumber);
-
-      const teamsList = (ph.teams || []).map((t) => ({
-        key: t.key,
-        name: t.name,
-        count: countsByKey[String(t.key)] || 0,
-        points: asInt(ph.points?.[String(t.key)] ?? 0, 0)
-      }));
+      const teamsList = buildTeamsList(ph, countsByKey);
 
       return res.json({
         ok: true,
@@ -432,8 +498,11 @@ export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin
           status: ph.status,
           winnerTeam: ph.winnerTeam || null,
           teamsList,
+          teamsAll: teamsList.map((t) => ({ key: t.key, name: t.name })),
           teams: teamsToLegacyMap(ph.teams),
-          counts: countsToLegacyABC(ph.teams, countsByKey)
+          countsByKey,
+          counts: countsToLegacyABC(ph.teams, countsByKey),
+          points: ph.points || {}
         }
       });
     } catch (e) {
@@ -509,14 +578,13 @@ export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin
       }
 
       const ph = await getPhase(q, tor.id, tor.currentPhase);
-
       const countsByKey = ph ? await getCountsByKey(q, tor.id, ph.phaseNumber) : {};
       const listsByKey = ph ? await getTeamListsByKey(q, tor.id, ph.phaseNumber) : {};
 
       const teamsList = ph
         ? (ph.teams || []).map((t) => ({
-            key: t.key,
-            name: t.name,
+            key: String(t.key),
+            name: String(t.name),
             count: countsByKey[String(t.key)] || 0,
             points: asInt(ph.points?.[String(t.key)] ?? 0, 0),
             list: listsByKey[String(t.key)] || []
@@ -542,7 +610,9 @@ export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin
               status: ph.status,
               winnerTeam: ph.winnerTeam || null,
               teamsList,
+              teamsAll: teamsList.map((t) => ({ key: t.key, name: t.name })),
               teams: teamsToLegacyMap(ph.teams),
+              countsByKey,
               counts: countsToLegacyABC(ph.teams, countsByKey),
               lists: listsToLegacyABC(ph.teams, listsByKey),
               points: ph.points || {}
@@ -564,7 +634,6 @@ export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin
       if (exists) return res.status(400).json({ error: "ja_ativo" });
 
       const name = safeText(req.body?.name, 80) || "Torneio";
-
       const teams = buildTeams(pickTeamsFromBody(req.body));
       const legacy = teamsToLegacyMap(teams);
 
@@ -586,6 +655,8 @@ export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin
       );
 
       sseSendAll?.("torneio-changed", { reason: "start", torneioId });
+
+      await announceSafe(formatPhaseOpenMsg(name, 1, teams));
 
       return res.json({ ok: true, torneioId });
     } catch (e) {
@@ -613,6 +684,8 @@ export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin
       );
 
       sseSendAll?.("torneio-changed", { reason: "close", torneioId: tor.id, phase: ph.phaseNumber });
+
+      await announceSafe(formatPhaseCloseMsg(tor.name, ph.phaseNumber));
 
       return res.json({ ok: true });
     } catch (e) {
@@ -715,6 +788,8 @@ export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin
 
       sseSendAll?.("torneio-changed", { reason: "decide", torneioId: tor.id, phase: ph.phaseNumber, winnerTeam: resolved.key });
 
+      await announceSafe(formatPhaseDecideMsg(tor.name, ph.phaseNumber, resolved.name));
+
       return res.json({ ok: true });
     } catch (e) {
       console.error("torneio/admin/decide:", e?.message || e);
@@ -750,6 +825,8 @@ export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin
 
       sseSendAll?.("torneio-changed", { reason: "open-next", torneioId: tor.id, phase: nextNum });
 
+      await announceSafe(formatPhaseOpenMsg(tor.name, nextNum, teams));
+
       return res.json({ ok: true, phase: nextNum });
     } catch (e) {
       console.error("torneio/admin/open-next:", e?.message || e);
@@ -771,7 +848,23 @@ export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin
         [tor.id, T_STATUS.FINALIZADO]
       );
 
+      const limit = Math.min(Math.max(parseInt(req.body?.limit || "80", 10) || 80, 1), 2000);
+      const { rows } = await q(
+        `SELECT twitch_name AS "twitchName"
+         FROM torneio_participants
+         WHERE torneio_id = $1 AND alive = true
+         ORDER BY updated_at DESC
+         LIMIT ${limit}`,
+        [tor.id]
+      );
+
+      const winners = (rows || [])
+        .map((r) => String(r.twitchName || "").trim().replace(/^@+/, ""))
+        .filter(Boolean);
+
       sseSendAll?.("torneio-changed", { reason: "finish", torneioId: tor.id });
+
+      await announceSafe(formatFinishMsg(tor.name, winners.slice(0, 25)));
 
       return res.json({ ok: true });
     } catch (e) {
