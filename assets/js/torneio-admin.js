@@ -21,7 +21,9 @@
     const res = await fetch(`${API}${path}`, { credentials: "include", ...opts, headers });
     if (!res.ok) {
       let err;
-      try { err = await res.json(); } catch {}
+      try {
+        err = await res.json();
+      } catch {}
       throw new Error(err?.error || `HTTP ${res.status}`);
     }
     return res.status === 204 ? null : res.json();
@@ -306,28 +308,68 @@
 
   function teamsFromPhase(ph) {
     if (!ph) return [];
-    if (Array.isArray(ph.teams)) {
-      return ph.teams
-        .map((t) => ({ id: String(t.id || t.key || "").trim(), name: String(t.name || t.title || "").trim() }))
-        .filter((t) => t.id);
+
+    if (Array.isArray(ph.teamsList) && ph.teamsList.length) {
+      return ph.teamsList
+        .map((t) => {
+          const id = String(t?.key ?? t?.id ?? "").trim();
+          if (!id) return null;
+          const name = String(t?.name ?? t?.title ?? id).trim();
+          const count = Number(t?.count ?? 0) || 0;
+          const points = Number(t?.points ?? 0) || 0;
+          const list = Array.isArray(t?.list) ? t.list : [];
+          return { id, name, count, points, list };
+        })
+        .filter(Boolean);
     }
+
+    if (Array.isArray(ph.teams) && ph.teams.length) {
+      return ph.teams
+        .map((t) => {
+          const id = String(t?.key ?? t?.id ?? "").trim();
+          if (!id) return null;
+          const name = String(t?.name ?? t?.title ?? id).trim();
+          return { id, name, count: 0, points: 0, list: [] };
+        })
+        .filter(Boolean);
+    }
+
     const obj = ph.teams || {};
     const keys = Object.keys(obj);
     if (!keys.length) return [];
-    return keys.map((k) => ({ id: String(k).trim(), name: String(obj[k] || "").trim() })).filter((t) => t.id);
+    return keys.map((k) => ({ id: String(k).trim(), name: String(obj[k] || "").trim(), count: 0, points: 0, list: [] })).filter((t) => t.id);
+  }
+
+  function findTeam(ph, teamId) {
+    const k = String(teamId || "").trim();
+    if (!k) return null;
+    const arr = teamsFromPhase(ph);
+    return arr.find((t) => String(t.id) === k) || null;
   }
 
   function countsForTeam(ph, teamId) {
+    const t = findTeam(ph, teamId);
+    if (t) return Number(t.count ?? 0) || 0;
     const c = ph?.counts || {};
     const k = String(teamId || "").trim();
     return Number(c?.[k] ?? 0) || 0;
   }
 
   function listForTeam(ph, teamId) {
+    const t = findTeam(ph, teamId);
+    if (t && Array.isArray(t.list)) return t.list;
     const lists = ph?.lists || {};
     const k = String(teamId || "").trim();
     const arr = lists?.[k] || [];
     return Array.isArray(arr) ? arr : [];
+  }
+
+  function pointsForTeam(ph, teamId) {
+    const t = findTeam(ph, teamId);
+    if (t) return Number(t.points ?? 0) || 0;
+    const p = ph?.points || {};
+    const k = String(teamId || "").trim();
+    return Number(p?.[k] ?? 0) || 0;
   }
 
   function renderTeamsGrid(tab, tor, ph) {
@@ -339,7 +381,7 @@
     }
 
     const teams = teamsFromPhase(ph);
-    const pts = loadPoints(tor.id, ph.number);
+    const ptsLocal = loadPoints(tor.id, ph.number);
 
     grid.innerHTML = teams
       .map((t) => {
@@ -350,7 +392,10 @@
         const disabledWin = String(ph.status || "") === "DECIDIDA";
         const canDecide = String(ph.status || "") !== "DECIDIDA";
         const canWinNow = canDecide;
-        const pval = pts?.[id] ?? "";
+
+        const serverPts = pointsForTeam(ph, id);
+        const localPts = ptsLocal?.[id];
+        const pval = localPts !== undefined ? localPts : serverPts ? String(serverPts) : "";
 
         const items = listForTeam(ph, id);
         const listHtml = items && items.length
@@ -426,10 +471,7 @@
         renderTeamsGrid(tab, null, null);
         setWinners(winnersEl, []);
         setCmds(tab, []);
-        renderHints(tab, {
-          create: "Dica: com o backend atual, apenas 3 times são usados (A, B, C).",
-          next: "—"
-        });
+        renderHints(tab, { create: "—", next: "—" });
         applyButtons(tab, { canClose: false, canNext: false, canStart: true, canFinish: false });
         return;
       }
@@ -444,8 +486,7 @@
       if (createCard) createCard.style.display = "none";
       if (nextCard) nextCard.style.display = "";
 
-      const badgeText = tor?.name ? `ATIVO` : "ATIVO";
-      setBadge(tab, "ok", badgeText);
+      setBadge(tab, "ok", "ATIVO");
       setMini(tab, tor?.name ? `Torneio: ${tor.name}` : "Torneio ativo");
 
       if (!ph) {
@@ -453,10 +494,7 @@
         renderTeamsGrid(tab, tor, null);
         setWinners(winnersEl, data.alive || []);
         setCmds(tab, []);
-        renderHints(tab, {
-          create: "—",
-          next: "Abra uma fase para aparecer os times."
-        });
+        renderHints(tab, { create: "—", next: "Abra uma fase para aparecer os times." });
         applyButtons(tab, { canClose: false, canNext: false, canStart: false, canFinish: true });
         return;
       }
@@ -509,9 +547,9 @@
   async function decideWinner(teamId) {
     await apiFetch("/api/torneio/admin/decide", {
       method: "POST",
-      body: JSON.stringify({ winnerTeam: String(teamId || "").trim().toUpperCase() })
+      body: JSON.stringify({ winnerTeam: String(teamId || "").trim() })
     });
-    window.notify(`Vencedor: ${String(teamId || "").trim().toUpperCase()}`, "ok");
+    window.notify(`Vencedor: ${String(teamId || "").trim()}`, "ok");
     await refresh();
   }
 

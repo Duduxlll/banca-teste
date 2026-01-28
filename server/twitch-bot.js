@@ -38,6 +38,12 @@ export function initTwitchBot({
     "https://banca-teste.onrender.com/cashback-publico.html";
 
   const sayOnJoin = String(process.env.TOURNEY_SAY_JOIN || "").trim().toLowerCase() === "true";
+  const announceEnabled = String(process.env.TOURNEY_ANNOUNCE || "").trim().toLowerCase() === "true";
+  const announceIntervalMs = (() => {
+    const n = Number(process.env.TOURNEY_ANNOUNCE_INTERVAL_MS || 9000);
+    if (!Number.isFinite(n)) return 9000;
+    return Math.max(4000, Math.min(n, 60000));
+  })();
 
   const client = new tmi.Client({
     options: { debug: false },
@@ -57,6 +63,22 @@ export function initTwitchBot({
       .replace(/^@+/, "")
       .replace(/\s+/g, "")
       .toLowerCase();
+  }
+
+  function toAsciiLower(s = "") {
+    return String(s || "")
+      .normalize("NFD")
+      .replace(/\p{Diacritic}/gu, "")
+      .toLowerCase();
+  }
+
+  function normalizeTeamKey(name) {
+    const s = toAsciiLower(name)
+      .replace(/[^a-z0-9 _-]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/\s/g, "");
+    return s || null;
   }
 
   function parseCommand(msg) {
@@ -100,31 +122,82 @@ export function initTwitchBot({
     return { ok: true, data };
   }
 
-  function resolveTeamLetter(input, phaseTeams) {
+  function getTeamsFromStatePhase(phase) {
+    if (Array.isArray(phase?.teamsList) && phase.teamsList.length) {
+      return phase.teamsList
+        .map((t) => {
+          const key = String(t?.key ?? t?.id ?? "").trim();
+          const name = String(t?.name ?? key).trim();
+          if (!key) return null;
+          return { key, name };
+        })
+        .filter(Boolean);
+    }
+
+    if (Array.isArray(phase?.teams) && phase.teams.length) {
+      return phase.teams
+        .map((t) => {
+          const key = String(t?.key ?? t?.id ?? "").trim();
+          const name = String(t?.name ?? key).trim();
+          if (!key) return null;
+          return { key, name };
+        })
+        .filter(Boolean);
+    }
+
+    const legacy = phase?.teams || {};
+    const out = [];
+    if (legacy?.A) out.push({ key: "A", name: String(legacy.A) });
+    if (legacy?.B) out.push({ key: "B", name: String(legacy.B) });
+    if (legacy?.C) out.push({ key: "C", name: String(legacy.C) });
+    return out;
+  }
+
+  function resolveTeamKey(input, teams) {
     const raw = String(input || "").trim();
     if (!raw) return null;
 
     const up = raw.toUpperCase();
-    if (up === "A" || up === "B" || up === "C") return up;
+    if (up === "A" && teams?.[0]) return String(teams[0].key);
+    if (up === "B" && teams?.[1]) return String(teams[1].key);
+    if (up === "C" && teams?.[2]) return String(teams[2].key);
 
-    const want = normalizeKey(raw);
-    const a = normalizeKey(phaseTeams?.A || "");
-    const b = normalizeKey(phaseTeams?.B || "");
-    const c = normalizeKey(phaseTeams?.C || "");
+    const k = normalizeTeamKey(raw);
+    if (!k) return null;
 
-    if (want && a && want === a) return "A";
-    if (want && b && want === b) return "B";
-    if (want && c && want === c) return "C";
+    for (const t of teams || []) {
+      const tk = String(t.key || "");
+      const tn = String(t.name || "");
+      if (tk && normalizeTeamKey(tk) === k) return tk;
+      if (tn && normalizeTeamKey(tn) === k) return tk || k;
+    }
 
     return null;
   }
 
-  async function joinTeam(userTag, displayName, teamLetter) {
+  function formatTeamsHint(teams, max = 6) {
+    const arr = (teams || []).map((t) => String(t.name || t.key || "").trim()).filter(Boolean);
+    if (!arr.length) return "use: !time <nome do time>";
+    const slice = arr.slice(0, max);
+    const rest = arr.length - slice.length;
+    const list = slice.join(" | ");
+    return rest > 0 ? `use: !time ${list} | +${rest}` : `use: !time ${list}`;
+  }
+
+  function getTeamNameByKey(teams, key) {
+    const k = String(key || "").trim();
+    for (const t of teams || []) {
+      if (String(t.key || "").trim() === k) return String(t.name || t.key || "").trim();
+    }
+    return "";
+  }
+
+  async function joinTeam(userTag, displayName, teamKey) {
     const url = `http://127.0.0.1:${port}/api/torneio/join?key=${encodeURIComponent(apiKey)}`;
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ user: userTag, displayName, team: teamLetter }),
+      body: JSON.stringify({ user: userTag, displayName, team: teamKey }),
     });
 
     let data = null;
@@ -174,11 +247,11 @@ export function initTwitchBot({
   }
 
   const lastJoinPhase = new Map();
-  function shouldConfirmJoin(userKey, phaseNumber, teamLetter) {
+  function shouldConfirmJoin(userKey, phaseNumber, teamKey) {
     if (!sayOnJoin) return false;
     const k = `${userKey}`;
     const v = lastJoinPhase.get(k);
-    const nowSig = `${phaseNumber}:${teamLetter}`;
+    const nowSig = `${phaseNumber}:${teamKey}`;
     if (v === nowSig) return false;
     lastJoinPhase.set(k, nowSig);
     if (lastJoinPhase.size > 2000) {
@@ -188,8 +261,98 @@ export function initTwitchBot({
     return true;
   }
 
+  let pollTimer = null;
+  let lastAnnounceSig = "";
+  let lastAnnounceAt = 0;
+
+  function canAnnounce(sig) {
+    const now = Date.now();
+    if (sig && sig === lastAnnounceSig && now - lastAnnounceAt < 15000) return false;
+    if (now - lastAnnounceAt < 2500) return false;
+    lastAnnounceSig = sig || "";
+    lastAnnounceAt = now;
+    return true;
+  }
+
+  async function pollAnnounce() {
+    const st = await getTorneioState();
+    if (st.error) return;
+
+    const d = st.data || {};
+    const active = !!d.active;
+    const tor = d.torneio || null;
+    const phase = d.phase || null;
+
+    const torId = String(tor?.id || "");
+    const torName = String(tor?.name || "Torneio").trim();
+    const phaseNum = Number(phase?.number || tor?.currentPhase || 0) || 0;
+    const phStatus = String(phase?.status || "").toUpperCase();
+    const winnerKey = String(phase?.winnerTeam || "").trim();
+
+    const teams = getTeamsFromStatePhase(phase);
+    const teamsNames = (teams || []).map((t) => String(t.name || t.key || "").trim()).filter(Boolean);
+    const shortTeams = teamsNames.slice(0, 6);
+    const extra = teamsNames.length - shortTeams.length;
+    const teamsText = shortTeams.length ? `${shortTeams.join(" | ")}${extra > 0 ? ` | +${extra}` : ""}` : "";
+
+    const sig = `${active ? "1" : "0"}|${torId}|${phaseNum}|${phStatus}|${winnerKey}|${teamsNames.join(",")}`;
+
+    if (!canAnnounce(sig)) return;
+
+    if (!active) {
+      await say(`🏁 Torneio encerrado.`);
+      return;
+    }
+
+    if (!phase || !phaseNum) {
+      await say(`🏟️ ${torName} ativo, mas sem fase disponível agora.`);
+      return;
+    }
+
+    if (phStatus === "ABERTA") {
+      await say(`🏟️ ${torName} • Fase ${phaseNum} ABERTA ✅ ${teamsText ? `• Times: ${teamsText} • use !time <nome>` : "• use !time <nome do time>"}`);
+      return;
+    }
+
+    if (phStatus === "FECHADA") {
+      await say(`⛔ ${torName} • Fase ${phaseNum} FECHADA.`);
+      return;
+    }
+
+    if (phStatus === "DECIDIDA") {
+      const wn = winnerKey ? getTeamNameByKey(teams, winnerKey) : "";
+      const wLabel = winnerKey ? (wn && wn !== winnerKey ? `${winnerKey} (${wn})` : winnerKey) : "—";
+      await say(`🏆 ${torName} • Fase ${phaseNum} DECIDIDA • Vencedor: ${wLabel}.`);
+      return;
+    }
+  }
+
   client.on("connected", () => {
     log.log(`[twitch-bot] conectado em ${chan} como ${botUsername}`);
+    if (announceEnabled) {
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = setInterval(() => {
+        enqueue(async () => {
+          try {
+            await pollAnnounce();
+          } catch (e) {
+            log.error("[twitch-bot] poll announce erro:", e?.message || e);
+          }
+        });
+      }, announceIntervalMs);
+      enqueue(async () => {
+        try {
+          await pollAnnounce();
+        } catch {}
+      });
+    }
+  });
+
+  client.on("disconnected", () => {
+    if (pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
   });
 
   client.on("message", (channelName, tags, message, self) => {
@@ -251,16 +414,16 @@ export function initTwitchBot({
           return;
         }
 
-        const teamLetter = resolveTeamLetter(rawChoice, phase.teams);
-        if (!teamLetter) {
-          const a = phase.teams?.A || "A";
-          const b = phase.teams?.B || "B";
-          const c = phase.teams?.C || "C";
-          await say(`${mention} time inválido. Use: !time ${a} | !time ${b} | !time ${c}`);
+        const teams = getTeamsFromStatePhase(phase);
+        const teamKey = resolveTeamKey(rawChoice, teams);
+
+        if (!teamKey) {
+          await say(`${mention} time inválido. ${formatTeamsHint(teams, 6)}`);
           return;
         }
 
-        const r = await joinTeam(userTag || user, display || user, teamLetter);
+        const r = await joinTeam(userTag || user, display || user, teamKey);
+
         if (r.error === "torneio_inativo") {
           await say(`${mention} torneio não está ativo agora.`);
           return;
@@ -274,10 +437,7 @@ export function initTwitchBot({
           return;
         }
         if (r.error === "time_invalido") {
-          const a = phase.teams?.A || "A";
-          const b = phase.teams?.B || "B";
-          const c = phase.teams?.C || "C";
-          await say(`${mention} time inválido. Use: !time ${a} | !time ${b} | !time ${c}`);
+          await say(`${mention} time inválido. ${formatTeamsHint(teams, 6)}`);
           return;
         }
         if (r.error) {
@@ -286,9 +446,9 @@ export function initTwitchBot({
         }
 
         const phaseNum = Number(r.data?.phase || phase.number || 1);
-        if (shouldConfirmJoin(userKey, phaseNum, teamLetter)) {
-          const name = r.data?.teamName || phase.teams?.[teamLetter] || "";
-          const label = name ? `${teamLetter} (${name})` : teamLetter;
+        if (shouldConfirmJoin(userKey, phaseNum, teamKey)) {
+          const name = r.data?.teamName || getTeamNameByKey(teams, teamKey) || "";
+          const label = name && name !== teamKey ? `${teamKey} (${name})` : teamKey;
           await say(`${mention} entrou no time ${label}.`);
         }
         return;
