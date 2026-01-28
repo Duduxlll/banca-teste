@@ -176,7 +176,9 @@ const tabExtratosEl   = qs('#tab-extratos');
 const tabCuponsEl     = qs('#tab-cupons');
 const tabSorteioEl    = qs('#tab-sorteio');
 const tabPalpiteEl    = qs('#tab-palpite');
-const tabCashbacksEl  = qs('#tab-cashbacks'); // ✅ NOVO
+const tabCashbacksEl  = qs('#tab-cashbacks'); 
+const tabTorneioEl    = qs('#tab-torneio');
+
 
 const tbodyBancas     = qs('#tblBancas tbody');
 const tbodyPags       = qs('#tblPagamentos tbody');
@@ -545,7 +547,24 @@ async function render(){
     if (window.PalpiteAdmin && typeof window.PalpiteAdmin.onTabShown === 'function') {
       try { window.PalpiteAdmin.onTabShown(); } catch(e){ console.error(e); }
     }
+
+    
+    } else if (TAB === 'torneio') {
+    tabTorneioEl?.classList.add('show');
+
+    tabBancasEl?.classList.remove('show');
+    tabPagamentosEl?.classList.remove('show');
+    tabExtratosEl?.classList.remove('show');
+    tabCuponsEl?.classList.remove('show');
+    tabSorteioEl?.classList.remove('show');
+    tabPalpiteEl?.classList.remove('show');
+    tabCashbacksEl?.classList.remove('show');
+
+    if (window.TorneioAdmin && typeof window.TorneioAdmin.onTabShown === 'function') {
+      try { window.TorneioAdmin.onTabShown(); } catch(e){ console.error(e); }
+    }
   }
+
 }
 
 function renderBancas(){
@@ -751,8 +770,8 @@ async function refresh(){
   } else if (TAB==='cupons'){
     await loadCupons();
   } else if (TAB==='sorteio') {
-    // (sorteio usa seu próprio JS)
-  } else if (TAB==='cashbacks') { // ✅ NOVO
+    
+  } else if (TAB==='cashbacks') { 
     if (window.CashbackAdmin && typeof window.CashbackAdmin.refresh === 'function') {
       try { await window.CashbackAdmin.refresh(); } catch(e){ console.error(e); }
     }
@@ -760,7 +779,13 @@ async function refresh(){
     if (window.PalpiteAdmin && typeof window.PalpiteAdmin.refresh === 'function') {
       try { await window.PalpiteAdmin.refresh(); } catch(e){ console.error(e); }
     }
+    
+    } else if (TAB === 'torneio') {
+    if (window.TorneioAdmin && typeof window.TorneioAdmin.refresh === 'function') {
+      try { await window.TorneioAdmin.refresh(); } catch(e){ console.error(e); }
+    }
   }
+
   render();
 }
 
@@ -1771,6 +1796,11 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   if (window.CashbackAdmin && typeof window.CashbackAdmin.init === 'function') {
     try { window.CashbackAdmin.init(); } catch(e){ console.error(e); }
   }
+  
+    if (window.TorneioAdmin && typeof window.TorneioAdmin.init === 'function') {
+    try { window.TorneioAdmin.init(); } catch(e){ console.error(e); }
+  }
+
 
   startStream();
   startCuponsAutoRefresh();
