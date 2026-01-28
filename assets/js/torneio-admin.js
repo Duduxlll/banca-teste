@@ -70,6 +70,15 @@
     document.head.appendChild(st);
   }
 
+  function formatTeamTitle(id, name) {
+  const raw = String(name || id || "").trim();
+  if (!raw) return "Time";
+  if (/^time\s+/i.test(raw)) return raw; 
+  const pretty = raw.charAt(0).toUpperCase() + raw.slice(1);
+  return `Time ${pretty}`;
+}
+
+
   function toKey(s) {
     const raw = String(s || "").trim();
     if (!raw) return "";
@@ -387,7 +396,7 @@
     grid.innerHTML = teams
       .map((t) => {
         const id = t.id;
-        const name = t.name || id;
+        const title = formatTeamTitle(id, t.name);
         const count = countsForTeam(ph, id);
         const winner = String(ph.winnerTeam || "") === String(id);
         const disabledWin = String(ph.status || "") === "DECIDIDA";
@@ -409,7 +418,7 @@
           <div class="card tr-card ${winner ? "tr-winnerMark" : ""}" data-team-card="1" data-team-id="${esc(id)}">
             <div class="tr-card-head">
               <div>
-                <div class="tr-card-title">${esc(id)} • ${esc(name)}</div>
+                <div class="tr-card-title">${esc(title)}</div>
                 <div class="tr-sub"><span class="tr-chip" data-role="count">${esc(String(count))}</span></div>
               </div>
 

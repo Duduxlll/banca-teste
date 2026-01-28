@@ -437,3 +437,20 @@
   filter: none !important;
   text-shadow: none !important;
 }
+
+
+#tab-torneio #trName.input,
+#tab-torneio input#trName,
+#tab-torneio .input,
+#tab-torneio input.input{
+  background: rgba(0,0,0,0.22) !important;
+  color: rgba(255,255,255,0.92) !important;
+  border-color: rgba(255,255,255,0.12) !important;
+}
+
+
+#tab-torneio input.input:-webkit-autofill,
+#tab-torneio input#trName:-webkit-autofill{
+  -webkit-text-fill-color: rgba(255,255,255,0.92) !important;
+  box-shadow: 0 0 0 1000px rgba(0,0,0,0.22) inset !important;
+}
