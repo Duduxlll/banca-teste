@@ -424,7 +424,7 @@
 
               <div style="display:grid;gap:8px;justify-items:end">
                 <div class="tr-points">
-                  <span class="tr-mini">PTS</span>
+                  <span class="tr-mini">Valor</span>
                   <input class="input" data-role="points" inputmode="numeric" placeholder="0" value="${esc(String(pval))}">
                 </div>
                 <button class="btn btn--primary" data-action="win" data-team="${esc(id)}" ${(!canWinNow || disabledWin) ? "disabled" : ""}>
