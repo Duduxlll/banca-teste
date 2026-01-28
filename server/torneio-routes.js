@@ -2,7 +2,6 @@ import rateLimit from "express-rate-limit";
 
 const T_STATUS = { ATIVO: "ATIVO", FINALIZADO: "FINALIZADO" };
 const P_STATUS = { ABERTA: "ABERTA", FECHADA: "FECHADA", DECIDIDA: "DECIDIDA" };
-const TEAM = ["A", "B", "C"];
 
 function normalizeName(name) {
   return String(name || "")
@@ -18,9 +17,117 @@ function safeText(v, max = 120) {
   return s.slice(0, max);
 }
 
-function isTeam(v) {
-  const t = String(v || "").trim().toUpperCase();
-  return TEAM.includes(t) ? t : null;
+function toAsciiLower(s = "") {
+  return String(s || "")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase();
+}
+
+function normalizeTeamKey(name) {
+  const s = toAsciiLower(name)
+    .replace(/[^a-z0-9 _-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\s/g, "");
+  return s || null;
+}
+
+function asInt(v, def = 0) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return def;
+  return Math.trunc(n);
+}
+
+function pickTeamsFromBody(body) {
+  const arr = Array.isArray(body?.teams) ? body.teams : null;
+  if (arr && arr.length) return arr.map((x) => safeText(x, 40)).filter(Boolean);
+
+  const a = safeText(body?.teamA, 40);
+  const b = safeText(body?.teamB, 40);
+  const c = safeText(body?.teamC, 40);
+  const out = [a, b, c].filter(Boolean);
+  return out.length ? out : ["Time A", "Time B", "Time C"];
+}
+
+function buildTeams(names) {
+  const raw = (names || []).map((x) => safeText(x, 40)).filter(Boolean);
+  const limited = raw.slice(0, 20);
+  const out = [];
+  const used = new Set();
+
+  for (const name of limited) {
+    let key = normalizeTeamKey(name);
+    if (!key) continue;
+    if (used.has(key)) {
+      let i = 2;
+      while (used.has(`${key}${i}`)) i++;
+      key = `${key}${i}`;
+    }
+    used.add(key);
+    out.push({ key, name });
+  }
+
+  if (out.length < 2) {
+    return [
+      { key: "timea", name: "Time A" },
+      { key: "timeb", name: "Time B" },
+      { key: "timec", name: "Time C" }
+    ];
+  }
+
+  return out;
+}
+
+function getTeamByIndex(teams, idx) {
+  if (!Array.isArray(teams)) return null;
+  const t = teams[idx];
+  if (!t) return null;
+  return { key: String(t.key), name: String(t.name) };
+}
+
+function resolveTeamInput(teams, inputRaw) {
+  const input = String(inputRaw || "").trim();
+  if (!input) return null;
+
+  const up = input.toUpperCase();
+  if (up === "A") return getTeamByIndex(teams, 0);
+  if (up === "B") return getTeamByIndex(teams, 1);
+  if (up === "C") return getTeamByIndex(teams, 2);
+
+  const k = normalizeTeamKey(input);
+  if (!k) return null;
+
+  for (const t of teams || []) {
+    const tk = String(t.key || "");
+    const tn = String(t.name || "");
+    if (tk && tk === k) return { key: tk, name: tn || tk };
+    if (normalizeTeamKey(tn) === k) return { key: tk || k, name: tn || input };
+  }
+
+  return null;
+}
+
+function teamsToLegacyMap(teams) {
+  return {
+    A: teams?.[0]?.name || "Time A",
+    B: teams?.[1]?.name || "Time B",
+    C: teams?.[2]?.name || "Time C"
+  };
+}
+
+function countsToLegacyABC(teams, countsByKey) {
+  const a = teams?.[0]?.key ? (countsByKey[String(teams[0].key)] || 0) : 0;
+  const b = teams?.[1]?.key ? (countsByKey[String(teams[1].key)] || 0) : 0;
+  const c = teams?.[2]?.key ? (countsByKey[String(teams[2].key)] || 0) : 0;
+  return { A: a, B: b, C: c };
+}
+
+function listsToLegacyABC(teams, listsByKey) {
+  const a = teams?.[0]?.key ? (listsByKey[String(teams[0].key)] || []) : [];
+  const b = teams?.[1]?.key ? (listsByKey[String(teams[1].key)] || []) : [];
+  const c = teams?.[2]?.key ? (listsByKey[String(teams[2].key)] || []) : [];
+  return { A: a, B: b, C: c };
 }
 
 export async function ensureTorneioTables(q) {
@@ -41,9 +148,11 @@ export async function ensureTorneioTables(q) {
       torneio_id TEXT NOT NULL REFERENCES torneios(id) ON DELETE CASCADE,
       phase_number INT NOT NULL,
       status TEXT NOT NULL DEFAULT 'ABERTA',
-      team_a_name TEXT NOT NULL,
-      team_b_name TEXT NOT NULL,
-      team_c_name TEXT NOT NULL,
+      team_a_name TEXT NOT NULL DEFAULT 'Time A',
+      team_b_name TEXT NOT NULL DEFAULT 'Time B',
+      team_c_name TEXT NOT NULL DEFAULT 'Time C',
+      teams_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+      points_json JSONB NOT NULL DEFAULT '{}'::jsonb,
       winner_team TEXT,
       opened_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       closed_at TIMESTAMPTZ,
@@ -80,6 +189,9 @@ export async function ensureTorneioTables(q) {
     )
   `);
 
+  await q(`ALTER TABLE torneio_phases ADD COLUMN IF NOT EXISTS teams_json JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await q(`ALTER TABLE torneio_phases ADD COLUMN IF NOT EXISTS points_json JSONB NOT NULL DEFAULT '{}'::jsonb`);
+
   await q(`CREATE INDEX IF NOT EXISTS torneios_status_idx ON torneios(status, created_at DESC)`);
   await q(`CREATE INDEX IF NOT EXISTS torneio_phases_idx ON torneio_phases(torneio_id, phase_number)`);
   await q(`CREATE INDEX IF NOT EXISTS torneio_participants_idx ON torneio_participants(torneio_id, alive, updated_at DESC)`);
@@ -98,6 +210,30 @@ async function getActiveTorneio(q) {
   return rows[0] || null;
 }
 
+function parseTeamsFromPhaseRow(r) {
+  let teams = [];
+  if (r?.teamsJson) {
+    const tj = r.teamsJson;
+    if (Array.isArray(tj)) {
+      teams = tj
+        .map((x) => {
+          const key = safeText(x?.key ?? x?.id ?? x?.k, 60);
+          const name = safeText(x?.name ?? x?.n ?? "", 60) || key;
+          if (!key) return null;
+          return { key, name };
+        })
+        .filter(Boolean);
+    }
+  }
+  if (!teams.length) {
+    const a = safeText(r?.teamAName, 40) || "Time A";
+    const b = safeText(r?.teamBName, 40) || "Time B";
+    const c = safeText(r?.teamCName, 40) || "Time C";
+    teams = buildTeams([a, b, c]);
+  }
+  return teams;
+}
+
 async function getPhase(q, torneioId, phaseNumber) {
   const { rows } = await q(
     `SELECT
@@ -108,6 +244,8 @@ async function getPhase(q, torneioId, phaseNumber) {
        team_a_name AS "teamAName",
        team_b_name AS "teamBName",
        team_c_name AS "teamCName",
+       teams_json AS "teamsJson",
+       points_json AS "pointsJson",
        winner_team AS "winnerTeam",
        opened_at AS "openedAt",
        closed_at AS "closedAt",
@@ -117,10 +255,29 @@ async function getPhase(q, torneioId, phaseNumber) {
      LIMIT 1`,
     [torneioId, phaseNumber]
   );
-  return rows[0] || null;
+  if (!rows[0]) return null;
+
+  const r = rows[0];
+  const teams = parseTeamsFromPhaseRow(r);
+
+  const points = r.pointsJson && typeof r.pointsJson === "object" ? r.pointsJson : {};
+
+  return {
+    id: r.id,
+    torneioId: r.torneioId,
+    phaseNumber: r.phaseNumber,
+    status: r.status,
+    teams,
+    legacyTeams: { A: r.teamAName, B: r.teamBName, C: r.teamCName },
+    winnerTeam: r.winnerTeam,
+    points,
+    openedAt: r.openedAt,
+    closedAt: r.closedAt,
+    decidedAt: r.decidedAt
+  };
 }
 
-async function getCounts(q, torneioId, phaseNumber) {
+async function getCountsByKey(q, torneioId, phaseNumber) {
   const { rows } = await q(
     `SELECT team, COUNT(*)::int AS c
      FROM torneio_choices
@@ -128,11 +285,15 @@ async function getCounts(q, torneioId, phaseNumber) {
      GROUP BY team`,
     [torneioId, phaseNumber]
   );
-  const m = new Map((rows || []).map((r) => [String(r.team || "").toUpperCase(), Number(r.c) || 0]));
-  return { A: m.get("A") || 0, B: m.get("B") || 0, C: m.get("C") || 0 };
+  const out = {};
+  for (const r of rows || []) {
+    const k = String(r.team || "");
+    out[k] = Number(r.c) || 0;
+  }
+  return out;
 }
 
-async function getTeamLists(q, torneioId, phaseNumber) {
+async function getTeamListsByKey(q, torneioId, phaseNumber) {
   const { rows } = await q(
     `SELECT
        c.team,
@@ -146,11 +307,11 @@ async function getTeamLists(q, torneioId, phaseNumber) {
     [torneioId, phaseNumber]
   );
 
-  const out = { A: [], B: [], C: [] };
+  const out = {};
   for (const r of rows || []) {
-    const t = String(r.team || "").toUpperCase();
-    if (!out[t]) continue;
-    out[t].push({ twitchName: r.twitchName, displayName: r.displayName });
+    const k = String(r.team || "");
+    if (!out[k]) out[k] = [];
+    out[k].push({ twitchName: r.twitchName, displayName: r.displayName });
   }
   return out;
 }
@@ -181,7 +342,7 @@ async function upsertParticipant(q, uid, torneioId, twitchName, twitchLc, displa
   return rows[0]?.id || null;
 }
 
-async function upsertChoice(q, uid, torneioId, phaseNumber, twitchLc, team) {
+async function upsertChoice(q, uid, torneioId, phaseNumber, twitchLc, teamKey) {
   const { rows } = await q(
     `INSERT INTO torneio_choices
       (id, torneio_id, phase_number, twitch_name_lc, team, chosen_at, updated_at)
@@ -191,12 +352,12 @@ async function upsertChoice(q, uid, torneioId, phaseNumber, twitchLc, team) {
        team = EXCLUDED.team,
        updated_at = now()
      RETURNING id`,
-    [uid(), torneioId, phaseNumber, twitchLc, team]
+    [uid(), torneioId, phaseNumber, twitchLc, teamKey]
   );
   return rows[0]?.id || null;
 }
 
-async function eliminateNotInWinner(q, torneioId, phaseNumber, winnerTeam) {
+async function eliminateNotInWinner(q, torneioId, phaseNumber, winnerTeamKey) {
   await q(
     `UPDATE torneio_participants p
      SET alive = false,
@@ -211,7 +372,20 @@ async function eliminateNotInWinner(q, torneioId, phaseNumber, winnerTeam) {
            AND c.phase_number = $2
            AND c.team = $3
        )`,
-    [torneioId, phaseNumber, winnerTeam]
+    [torneioId, phaseNumber, winnerTeamKey]
+  );
+}
+
+async function writePhaseTeams(q, torneioId, phaseNumber, teams) {
+  const legacy = teamsToLegacyMap(teams);
+  await q(
+    `UPDATE torneio_phases
+     SET teams_json = $3::jsonb,
+         team_a_name = $4,
+         team_b_name = $5,
+         team_c_name = $6
+     WHERE torneio_id = $1 AND phase_number = $2`,
+    [torneioId, phaseNumber, JSON.stringify(teams), legacy.A, legacy.B, legacy.C]
   );
 }
 
@@ -227,8 +401,7 @@ export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin
     windowMs: 15 * 1000,
     max: 6,
     standardHeaders: true,
-    legacyHeaders: false,
-   
+    legacyHeaders: false
   });
 
   app.get("/api/torneio/state", requireAppKey, async (req, res) => {
@@ -241,7 +414,14 @@ export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin
       const ph = await getPhase(q, tor.id, tor.currentPhase);
       if (!ph) return res.json({ ok: true, active: true, torneio: tor, phase: null });
 
-      const counts = await getCounts(q, tor.id, ph.phaseNumber);
+      const countsByKey = await getCountsByKey(q, tor.id, ph.phaseNumber);
+
+      const teamsList = (ph.teams || []).map((t) => ({
+        key: t.key,
+        name: t.name,
+        count: countsByKey[String(t.key)] || 0,
+        points: asInt(ph.points?.[String(t.key)] ?? 0, 0)
+      }));
 
       return res.json({
         ok: true,
@@ -250,10 +430,11 @@ export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin
         phase: {
           number: ph.phaseNumber,
           status: ph.status,
-          teams: { A: ph.teamAName, B: ph.teamBName, C: ph.teamCName },
           winnerTeam: ph.winnerTeam || null,
-          counts,
-        },
+          teamsList,
+          teams: teamsToLegacyMap(ph.teams),
+          counts: countsToLegacyABC(ph.teams, countsByKey)
+        }
       });
     } catch (e) {
       console.error("torneio/state:", e?.message || e);
@@ -272,11 +453,9 @@ export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin
       if (!ph) return res.status(400).json({ error: "fase_invalida" });
       if (String(ph.status) !== P_STATUS.ABERTA) return res.status(400).json({ error: "fase_fechada" });
 
-      const team = isTeam(req.body?.team);
-      if (!team) return res.status(400).json({ error: "time_invalido" });
-
       const userRaw = req.body?.user ?? req.body?.twitchName ?? "";
       const displayRaw = req.body?.displayName ?? req.body?.display ?? "";
+      const teamRaw = req.body?.team ?? req.body?.teamName ?? req.body?.time ?? "";
 
       const userLc = normalizeName(userRaw);
       const twitchName = safeText(String(userRaw).trim().replace(/^@+/, ""), 40);
@@ -289,21 +468,24 @@ export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin
         if (!alive) return res.status(403).json({ error: "nao_classificado" });
       }
 
+      const resolved = resolveTeamInput(ph.teams, teamRaw);
+      if (!resolved) return res.status(400).json({ error: "time_invalido" });
+
       await upsertParticipant(q, uid, tor.id, twitchName, userLc, displayName);
-      await upsertChoice(q, uid, tor.id, ph.phaseNumber, userLc, team);
+      await upsertChoice(q, uid, tor.id, ph.phaseNumber, userLc, resolved.key);
 
       sseSendAll?.("torneio-changed", { reason: "join", torneioId: tor.id, phase: ph.phaseNumber });
 
-      const teamNames = { A: ph.teamAName, B: ph.teamBName, C: ph.teamCName };
-      const counts = await getCounts(q, tor.id, ph.phaseNumber);
+      const countsByKey = await getCountsByKey(q, tor.id, ph.phaseNumber);
 
       return res.json({
         ok: true,
         torneioId: tor.id,
         phase: ph.phaseNumber,
-        team,
-        teamName: teamNames[team],
-        counts,
+        teamKey: resolved.key,
+        teamName: resolved.name,
+        countsByKey,
+        counts: countsToLegacyABC(ph.teams, countsByKey)
       });
     } catch (e) {
       console.error("torneio/join:", e?.message || e);
@@ -322,13 +504,24 @@ export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin
           active: false,
           torneio: null,
           phase: null,
-          alive: [],
+          alive: []
         });
       }
 
       const ph = await getPhase(q, tor.id, tor.currentPhase);
-      const counts = ph ? await getCounts(q, tor.id, ph.phaseNumber) : { A: 0, B: 0, C: 0 };
-      const lists = ph ? await getTeamLists(q, tor.id, ph.phaseNumber) : { A: [], B: [], C: [] };
+
+      const countsByKey = ph ? await getCountsByKey(q, tor.id, ph.phaseNumber) : {};
+      const listsByKey = ph ? await getTeamListsByKey(q, tor.id, ph.phaseNumber) : {};
+
+      const teamsList = ph
+        ? (ph.teams || []).map((t) => ({
+            key: t.key,
+            name: t.name,
+            count: countsByKey[String(t.key)] || 0,
+            points: asInt(ph.points?.[String(t.key)] ?? 0, 0),
+            list: listsByKey[String(t.key)] || []
+          }))
+        : [];
 
       const { rows: aliveRows } = await q(
         `SELECT COALESCE(display_name, twitch_name) AS name, twitch_name AS "twitchName"
@@ -347,13 +540,15 @@ export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin
           ? {
               number: ph.phaseNumber,
               status: ph.status,
-              teams: { A: ph.teamAName, B: ph.teamBName, C: ph.teamCName },
               winnerTeam: ph.winnerTeam || null,
-              counts,
-              lists,
+              teamsList,
+              teams: teamsToLegacyMap(ph.teams),
+              counts: countsToLegacyABC(ph.teams, countsByKey),
+              lists: listsToLegacyABC(ph.teams, listsByKey),
+              points: ph.points || {}
             }
           : null,
-        alive: aliveRows || [],
+        alive: aliveRows || []
       });
     } catch (e) {
       console.error("torneio/admin/current:", e?.message || e);
@@ -369,9 +564,9 @@ export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin
       if (exists) return res.status(400).json({ error: "ja_ativo" });
 
       const name = safeText(req.body?.name, 80) || "Torneio";
-      const teamA = safeText(req.body?.teamA, 40) || "Time A";
-      const teamB = safeText(req.body?.teamB, 40) || "Time B";
-      const teamC = safeText(req.body?.teamC, 40) || "Time C";
+
+      const teams = buildTeams(pickTeamsFromBody(req.body));
+      const legacy = teamsToLegacyMap(teams);
 
       const torneioId = uid();
       const phaseId = uid();
@@ -384,10 +579,10 @@ export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin
 
       await q(
         `INSERT INTO torneio_phases
-          (id, torneio_id, phase_number, status, team_a_name, team_b_name, team_c_name, opened_at)
+          (id, torneio_id, phase_number, status, team_a_name, team_b_name, team_c_name, teams_json, points_json, opened_at)
          VALUES
-          ($1, $2, 1, $3, $4, $5, $6, now())`,
-        [phaseId, torneioId, P_STATUS.ABERTA, teamA, teamB, teamC]
+          ($1, $2, 1, $3, $4, $5, $6, $7::jsonb, '{}'::jsonb, now())`,
+        [phaseId, torneioId, P_STATUS.ABERTA, legacy.A, legacy.B, legacy.C, JSON.stringify(teams)]
       );
 
       sseSendAll?.("torneio-changed", { reason: "start", torneioId });
@@ -426,6 +621,73 @@ export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin
     }
   });
 
+  app.patch("/api/torneio/admin/teams", requireAdmin, async (req, res) => {
+    try {
+      await ensureReady();
+
+      const tor = await getActiveTorneio(q);
+      if (!tor) return res.status(400).json({ error: "torneio_inativo" });
+
+      const ph = await getPhase(q, tor.id, tor.currentPhase);
+      if (!ph) return res.status(400).json({ error: "fase_invalida" });
+      if (String(ph.status) !== P_STATUS.ABERTA) return res.status(400).json({ error: "fase_nao_aberta" });
+
+      const teams = buildTeams(pickTeamsFromBody(req.body));
+      await writePhaseTeams(q, tor.id, ph.phaseNumber, teams);
+
+      sseSendAll?.("torneio-changed", { reason: "teams", torneioId: tor.id, phase: ph.phaseNumber });
+
+      return res.json({ ok: true });
+    } catch (e) {
+      console.error("torneio/admin/teams:", e?.message || e);
+      return res.status(500).json({ error: "falha_teams" });
+    }
+  });
+
+  app.patch("/api/torneio/admin/points", requireAdmin, async (req, res) => {
+    try {
+      await ensureReady();
+
+      const tor = await getActiveTorneio(q);
+      if (!tor) return res.status(400).json({ error: "torneio_inativo" });
+
+      const ph = await getPhase(q, tor.id, tor.currentPhase);
+      if (!ph) return res.status(400).json({ error: "fase_invalida" });
+
+      const inPoints = req.body?.points;
+      if (!inPoints || typeof inPoints !== "object") return res.status(400).json({ error: "points_invalidos" });
+
+      const map = {};
+      if (Array.isArray(inPoints)) {
+        for (const row of inPoints) {
+          const resolved = resolveTeamInput(ph.teams, row?.team ?? row?.teamName ?? row?.name ?? row?.key);
+          if (!resolved) continue;
+          map[String(resolved.key)] = asInt(row?.points ?? row?.pontos ?? row?.value ?? 0, 0);
+        }
+      } else {
+        for (const [k, v] of Object.entries(inPoints)) {
+          const resolved = resolveTeamInput(ph.teams, k);
+          if (!resolved) continue;
+          map[String(resolved.key)] = asInt(v, 0);
+        }
+      }
+
+      await q(
+        `UPDATE torneio_phases
+         SET points_json = $3::jsonb
+         WHERE torneio_id = $1 AND phase_number = $2`,
+        [tor.id, ph.phaseNumber, JSON.stringify(map)]
+      );
+
+      sseSendAll?.("torneio-changed", { reason: "points", torneioId: tor.id, phase: ph.phaseNumber });
+
+      return res.json({ ok: true });
+    } catch (e) {
+      console.error("torneio/admin/points:", e?.message || e);
+      return res.status(500).json({ error: "falha_points" });
+    }
+  });
+
   app.post("/api/torneio/admin/decide", requireAdmin, async (req, res) => {
     try {
       await ensureReady();
@@ -436,8 +698,8 @@ export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin
       const ph = await getPhase(q, tor.id, tor.currentPhase);
       if (!ph) return res.status(400).json({ error: "fase_invalida" });
 
-      const winnerTeam = isTeam(req.body?.winnerTeam);
-      if (!winnerTeam) return res.status(400).json({ error: "winner_invalido" });
+      const resolved = resolveTeamInput(ph.teams, req.body?.winnerTeam ?? req.body?.winner ?? req.body?.team ?? "");
+      if (!resolved) return res.status(400).json({ error: "winner_invalido" });
 
       await q(
         `UPDATE torneio_phases
@@ -446,12 +708,12 @@ export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin
              closed_at = COALESCE(closed_at, now()),
              decided_at = now()
          WHERE torneio_id = $1 AND phase_number = $2`,
-        [tor.id, ph.phaseNumber, winnerTeam, P_STATUS.DECIDIDA]
+        [tor.id, ph.phaseNumber, resolved.key, P_STATUS.DECIDIDA]
       );
 
-      await eliminateNotInWinner(q, tor.id, ph.phaseNumber, winnerTeam);
+      await eliminateNotInWinner(q, tor.id, ph.phaseNumber, resolved.key);
 
-      sseSendAll?.("torneio-changed", { reason: "decide", torneioId: tor.id, phase: ph.phaseNumber, winnerTeam });
+      sseSendAll?.("torneio-changed", { reason: "decide", torneioId: tor.id, phase: ph.phaseNumber, winnerTeam: resolved.key });
 
       return res.json({ ok: true });
     } catch (e) {
@@ -473,18 +735,17 @@ export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin
 
       const nextNum = Number(tor.currentPhase) + 1;
 
-      const teamA = safeText(req.body?.teamA, 40) || "Time A";
-      const teamB = safeText(req.body?.teamB, 40) || "Time B";
-      const teamC = safeText(req.body?.teamC, 40) || "Time C";
+      const teams = buildTeams(pickTeamsFromBody(req.body));
+      const legacy = teamsToLegacyMap(teams);
 
       await q(`UPDATE torneios SET current_phase = $2 WHERE id = $1`, [tor.id, nextNum]);
 
       await q(
         `INSERT INTO torneio_phases
-          (id, torneio_id, phase_number, status, team_a_name, team_b_name, team_c_name, opened_at)
+          (id, torneio_id, phase_number, status, team_a_name, team_b_name, team_c_name, teams_json, points_json, opened_at)
          VALUES
-          ($1, $2, $3, $4, $5, $6, $7, now())`,
-        [uid(), tor.id, nextNum, P_STATUS.ABERTA, teamA, teamB, teamC]
+          ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, '{}'::jsonb, now())`,
+        [uid(), tor.id, nextNum, P_STATUS.ABERTA, legacy.A, legacy.B, legacy.C, JSON.stringify(teams)]
       );
 
       sseSendAll?.("torneio-changed", { reason: "open-next", torneioId: tor.id, phase: nextNum });

@@ -1,23 +1,23 @@
 (() => {
   const API = window.location.origin;
   const qs = (s, r = document) => r.querySelector(s);
+  const qsa = (s, r = document) => Array.from(r.querySelectorAll(s));
 
   function getCookie(name) {
-    const m = document.cookie.match(new RegExp("(?:^|; )" + name.replace(/([$?*|{}\\^])/g, "\\$1") + "=([^;]*)"));
+    const m = document.cookie.match(
+      new RegExp("(?:^|; )" + name.replace(/([$?*|{}\\^])/g, "\\$1") + "=([^;]*)")
+    );
     return m ? decodeURIComponent(m[1]) : null;
   }
 
   async function apiFetch(path, opts = {}) {
     if (typeof window.apiFetch === "function") return window.apiFetch(path, opts);
-
     const headers = { "Content-Type": "application/json", ...(opts.headers || {}) };
     const method = (opts.method || "GET").toUpperCase();
-
     if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
       const csrf = getCookie("csrf");
       if (csrf) headers["X-CSRF-Token"] = csrf;
     }
-
     const res = await fetch(`${API}${path}`, { credentials: "include", ...opts, headers });
     if (!res.ok) {
       let err;
@@ -57,117 +57,242 @@
     };
   }
 
-  const esc = (s = "") => String(s).replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+  const esc = (s = "") =>
+    String(s).replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+
+  function injectOnce(id, css) {
+    if (document.getElementById(id)) return;
+    const st = document.createElement("style");
+    st.id = id;
+    st.textContent = css;
+    document.head.appendChild(st);
+  }
+
+  function toKey(s) {
+    const raw = String(s || "").trim();
+    if (!raw) return "";
+    const noMarks = raw.normalize("NFD").replace(/\p{Diacritic}/gu, "");
+    return noMarks.replace(/[^A-Za-z0-9_-]/g, "").toUpperCase();
+  }
+
+  function safeTeamName(s) {
+    const v = String(s ?? "").trim();
+    return v ? v.slice(0, 40) : "";
+  }
+
+  function normalizeTeamsInput(list) {
+    const names = (list || []).map((x) => safeTeamName(x)).filter(Boolean);
+    const uniq = [];
+    const seen = new Set();
+    for (const n of names) {
+      const k = toKey(n) || n.toLowerCase();
+      if (seen.has(k)) continue;
+      seen.add(k);
+      uniq.push(n);
+    }
+    return uniq;
+  }
+
+  function pointsStoreKey(torneioId, phaseNumber) {
+    return `tr_points_${String(torneioId || "")}_${String(phaseNumber || "")}`;
+  }
+
+  function loadPoints(torneioId, phaseNumber) {
+    try {
+      const raw = localStorage.getItem(pointsStoreKey(torneioId, phaseNumber));
+      if (!raw) return {};
+      const obj = JSON.parse(raw);
+      return obj && typeof obj === "object" ? obj : {};
+    } catch {
+      return {};
+    }
+  }
+
+  function savePoints(torneioId, phaseNumber, obj) {
+    try {
+      localStorage.setItem(pointsStoreKey(torneioId, phaseNumber), JSON.stringify(obj || {}));
+    } catch {}
+  }
+
+  let inited = false;
+  let lastData = null;
 
   function ensureUI() {
     const tab = qs("#tab-torneio");
     if (!tab) return null;
     if (qs("#trRoot", tab)) return tab;
 
+    injectOnce(
+      "trAdminCSS",
+      `
+      .tr-root{display:grid;gap:12px}
+      .tr-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+      .tr-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+      .tr-line{margin-top:8px;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.04)}
+      .tr-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);font-weight:800;font-size:.85rem}
+      .tr-badge.ok{border-color:rgba(60,255,120,.22)}
+      .tr-badge.warn{border-color:rgba(255,190,60,.22)}
+      .tr-badge.bad{border-color:rgba(255,80,80,.22)}
+      .tr-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+      .tr-grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+      @media (max-width: 980px){.tr-grid{grid-template-columns:minmax(0,1fr)}.tr-grid2{grid-template-columns:minmax(0,1fr)}}
+      .tr-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px}
+      .tr-card-title{font-weight:900;font-size:1.05rem}
+      .tr-sub{opacity:.82;font-size:.88rem}
+      .tr-chip{display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:26px;padding:0 10px;border-radius:999px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);font-weight:900}
+      .tr-list{max-height:320px;overflow:auto;border-radius:12px;border:1px solid rgba(255,255,255,.08);background:rgba(0,0,0,.12)}
+      .tr-item{display:flex;justify-content:space-between;gap:8px;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.06)}
+      .tr-item:last-child{border-bottom:0}
+      .tr-item span{opacity:.85}
+      .tr-item strong{font-weight:900}
+      .tr-winners{padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.04);min-height:42px}
+      .tr-pill{display:inline-flex;gap:6px;align-items:center;padding:6px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);margin:4px 6px 0 0;font-weight:800}
+      .tr-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+      .tr-mini{font-size:.85rem;opacity:.8}
+      .tr-hr{height:1px;background:rgba(255,255,255,.08);margin:10px 0}
+      .tr-team-row{display:flex;gap:8px;align-items:center}
+      .tr-team-row .input{flex:1}
+      .tr-team-row .btn{white-space:nowrap}
+      .tr-points{display:flex;gap:8px;align-items:center}
+      .tr-points input{max-width:120px}
+      .tr-winnerMark{border:1px solid rgba(60,255,120,.22);background:rgba(60,255,120,.08)}
+      `
+    );
+
     tab.innerHTML = `
       <div id="trRoot" class="tr-root">
 
-        <div class="card" style="margin-bottom:12px">
+        <div class="card">
           <div class="tr-head">
             <div>
               <h2 style="margin:0">🏟️ Torneio</h2>
-              <p class="muted" style="margin:6px 0 0">Chat: <code>!time A</code> <code>!time B</code> <code>!time C</code></p>
+              <div class="tr-row" style="margin-top:6px">
+                <span class="tr-badge" id="trBadge">—</span>
+                <span class="tr-mini" id="trMini">—</span>
+              </div>
             </div>
             <div class="tr-actions">
               <button class="btn btn--primary" id="trRefresh">Atualizar</button>
-              <button class="btn btn--danger" id="trFinish">Finalizar</button>
+              <button class="btn" id="trClosePhase">Fechar fase</button>
+              <button class="btn btn--danger" id="trFinish">Finalizar torneio</button>
             </div>
           </div>
           <div class="tr-line" id="trStatusLine">—</div>
+          <div class="tr-row" style="margin-top:10px">
+            <div class="tr-mini">Comandos:</div>
+            <div class="tr-row" id="trCmds" style="gap:6px;flex:1"></div>
+            <button class="btn btn--ghost" id="trCopyCmds">Copiar</button>
+          </div>
         </div>
 
-        <div class="card" style="margin-bottom:12px">
-          <div class="tr-grid2">
+        <div class="card" id="trCreateCard">
+          <div class="tr-head">
             <div>
-              <div class="muted" style="margin-bottom:6px">Criar torneio</div>
-              <div class="tr-form">
-                <input id="trName" class="input" placeholder="Nome do torneio">
-                <input id="trA" class="input" placeholder="Nome do time A">
-                <input id="trB" class="input" placeholder="Nome do time B">
-                <input id="trC" class="input" placeholder="Nome do time C">
-                <button class="btn btn--primary" id="trStart">Iniciar (fase 1)</button>
-              </div>
-              <div class="muted" style="margin-top:8px;font-size:.85rem">A fase 1 inicia aberta.</div>
+              <h3 style="margin:0">Criar novo torneio</h3>
+              <p class="muted" style="margin:6px 0 0">Defina o nome e os times da fase 1.</p>
             </div>
+            <div class="tr-actions">
+              <button class="btn" id="trAddTeamCreate">+ Time</button>
+              <button class="btn btn--primary" id="trStart">Iniciar fase 1</button>
+            </div>
+          </div>
 
+          <div class="tr-hr"></div>
+
+          <div class="tr-row">
+            <input id="trName" class="input" placeholder="Nome do torneio" style="flex:1">
+          </div>
+
+          <div style="margin-top:10px;display:grid;gap:8px" id="trTeamsCreate"></div>
+          <div class="muted" style="margin-top:10px;font-size:.85rem" id="trCreateHint">—</div>
+        </div>
+
+        <div class="card" id="trNextCard">
+          <div class="tr-head">
             <div>
-              <div class="muted" style="margin-bottom:6px">Abrir próxima fase</div>
-              <div class="tr-form">
-                <input id="trNA" class="input" placeholder="Nome do time A">
-                <input id="trNB" class="input" placeholder="Nome do time B">
-                <input id="trNC" class="input" placeholder="Nome do time C">
-                <button class="btn" id="trOpenNext">Abrir próxima fase</button>
-              </div>
-              <div class="muted" style="margin-top:8px;font-size:.85rem">Só abre a próxima fase depois de decidir a atual.</div>
+              <h3 style="margin:0">Próxima fase</h3>
+              <p class="muted" style="margin:6px 0 0">Só abre depois de decidir a fase atual.</p>
+            </div>
+            <div class="tr-actions">
+              <button class="btn" id="trAddTeamNext">+ Time</button>
+              <button class="btn btn--primary" id="trOpenNext">Abrir próxima fase</button>
             </div>
           </div>
+
+          <div class="tr-hr"></div>
+
+          <div style="display:grid;gap:8px" id="trTeamsNext"></div>
+          <div class="muted" style="margin-top:10px;font-size:.85rem" id="trNextHint">—</div>
         </div>
 
-        <div class="tr-grid">
-          <div class="card tr-card">
-            <div class="tr-card-head">
-              <div>
-                <div class="tr-card-title" id="trTeamATitle">Time A</div>
-                <div class="tr-card-sub"><span class="tr-chip" id="trCountA">0</span></div>
-              </div>
-              <button class="btn ghost tr-win" data-win="A">Vencedor A</button>
-            </div>
-            <div class="tr-list" id="trListA"></div>
-          </div>
+        <div class="tr-grid" id="trTeamsGrid"></div>
 
-          <div class="card tr-card">
-            <div class="tr-card-head">
-              <div>
-                <div class="tr-card-title" id="trTeamBTitle">Time B</div>
-                <div class="tr-card-sub"><span class="tr-chip" id="trCountB">0</span></div>
-              </div>
-              <button class="btn ghost tr-win" data-win="B">Vencedor B</button>
-            </div>
-            <div class="tr-list" id="trListB"></div>
-          </div>
-
-          <div class="card tr-card">
-            <div class="tr-card-head">
-              <div>
-                <div class="tr-card-title" id="trTeamCTitle">Time C</div>
-                <div class="tr-card-sub"><span class="tr-chip" id="trCountC">0</span></div>
-              </div>
-              <button class="btn ghost tr-win" data-win="C">Vencedor C</button>
-            </div>
-            <div class="tr-list" id="trListC"></div>
-          </div>
-        </div>
-
-        <div class="card" style="margin-top:12px">
+        <div class="card">
           <div class="tr-head" style="align-items:center">
             <div>
               <h3 style="margin:0">✅ Classificados (vivos)</h3>
               <p class="muted" style="margin:6px 0 0">Quem permanece no torneio</p>
             </div>
-            <button class="btn ghost" id="trCopyWinners">Copiar lista</button>
+            <button class="btn btn--ghost" id="trCopyWinners">Copiar lista</button>
           </div>
           <div class="tr-winners" id="trWinners">—</div>
         </div>
 
       </div>
     `;
+
+    ensureTeamInputs(qs("#trTeamsCreate", tab), ["Time A", "Time B", "Time C"]);
+    ensureTeamInputs(qs("#trTeamsNext", tab), ["Time A", "Time B", "Time C"]);
     return tab;
   }
 
-  function setList(el, arr) {
-    if (!el) return;
-    if (!arr || !arr.length) {
-      el.innerHTML = `<div class="muted" style="padding:10px">—</div>`;
-      return;
-    }
-    el.innerHTML = arr
-      .map(x => `<div class="tr-item"><span>@${esc(x.twitchName || "")}</span><strong>${esc(x.displayName || x.twitchName || "")}</strong></div>`)
-      .join("");
+  function ensureTeamInputs(container, names) {
+    if (!container) return;
+    const current = qsa('[data-team-input="1"]', container).map((i) => i.value);
+    const base = (names && names.length ? names : current.length ? current : ["Time A", "Time B", "Time C"]).slice(0, 12);
+    container.innerHTML = "";
+    for (const n of base) addTeamInputRow(container, n);
+    if (qsa('[data-team-input="1"]', container).length < 2) addTeamInputRow(container, "");
+  }
+
+  function addTeamInputRow(container, value = "") {
+    const row = document.createElement("div");
+    row.className = "tr-team-row";
+    row.innerHTML = `
+      <input class="input" data-team-input="1" placeholder="Nome do time" value="${esc(value)}">
+      <button class="btn btn--danger" type="button" data-team-remove="1">Remover</button>
+    `;
+    container.appendChild(row);
+  }
+
+  function readTeamInputs(container) {
+    if (!container) return [];
+    const vals = qsa('[data-team-input="1"]', container).map((i) => (i.value || "").trim());
+    return normalizeTeamsInput(vals);
+  }
+
+  function setBadge(tab, kind, text) {
+    const b = qs("#trBadge", tab);
+    if (!b) return;
+    b.classList.remove("ok", "warn", "bad");
+    if (kind) b.classList.add(kind);
+    b.textContent = text || "—";
+  }
+
+  function setMini(tab, text) {
+    const m = qs("#trMini", tab);
+    if (!m) return;
+    m.textContent = text || "—";
+  }
+
+  function setCmds(tab, teams) {
+    const cmds = qs("#trCmds", tab);
+    if (!cmds) return;
+    const list = (teams || []).map((t) => String(t.id || "").trim()).filter(Boolean);
+    const out = list.length ? list : [];
+    cmds.innerHTML = out.length
+      ? out.map((id) => `<span class="tr-pill">!time ${esc(id)}</span>`).join("")
+      : `<span class="muted">—</span>`;
   }
 
   function setWinners(el, arr) {
@@ -176,7 +301,107 @@
       el.innerHTML = `<div class="muted">—</div>`;
       return;
     }
-    el.innerHTML = `<div class="tr-winner-line">${arr.map(x => `<span class="tr-pill">@${esc(x.twitchName || "")}</span>`).join(" ")}</div>`;
+    el.innerHTML = `<div>${arr.map((x) => `<span class="tr-pill">@${esc(x.twitchName || "")}</span>`).join(" ")}</div>`;
+  }
+
+  function teamsFromPhase(ph) {
+    if (!ph) return [];
+    if (Array.isArray(ph.teams)) {
+      return ph.teams
+        .map((t) => ({ id: String(t.id || t.key || "").trim(), name: String(t.name || t.title || "").trim() }))
+        .filter((t) => t.id);
+    }
+    const obj = ph.teams || {};
+    const keys = Object.keys(obj);
+    if (!keys.length) return [];
+    return keys.map((k) => ({ id: String(k).trim(), name: String(obj[k] || "").trim() })).filter((t) => t.id);
+  }
+
+  function countsForTeam(ph, teamId) {
+    const c = ph?.counts || {};
+    const k = String(teamId || "").trim();
+    return Number(c?.[k] ?? 0) || 0;
+  }
+
+  function listForTeam(ph, teamId) {
+    const lists = ph?.lists || {};
+    const k = String(teamId || "").trim();
+    const arr = lists?.[k] || [];
+    return Array.isArray(arr) ? arr : [];
+  }
+
+  function renderTeamsGrid(tab, tor, ph) {
+    const grid = qs("#trTeamsGrid", tab);
+    if (!grid) return;
+    if (!tor || !ph) {
+      grid.innerHTML = "";
+      return;
+    }
+
+    const teams = teamsFromPhase(ph);
+    const pts = loadPoints(tor.id, ph.number);
+
+    grid.innerHTML = teams
+      .map((t) => {
+        const id = t.id;
+        const name = t.name || id;
+        const count = countsForTeam(ph, id);
+        const winner = String(ph.winnerTeam || "") === String(id);
+        const disabledWin = String(ph.status || "") === "DECIDIDA";
+        const canDecide = String(ph.status || "") !== "DECIDIDA";
+        const canWinNow = canDecide;
+        const pval = pts?.[id] ?? "";
+
+        const items = listForTeam(ph, id);
+        const listHtml = items && items.length
+          ? items
+              .map((x) => `<div class="tr-item"><span>@${esc(x.twitchName || "")}</span><strong>${esc(x.displayName || x.twitchName || "")}</strong></div>`)
+              .join("")
+          : `<div class="muted" style="padding:10px">—</div>`;
+
+        return `
+          <div class="card tr-card ${winner ? "tr-winnerMark" : ""}" data-team-card="1" data-team-id="${esc(id)}">
+            <div class="tr-card-head">
+              <div>
+                <div class="tr-card-title">${esc(id)} • ${esc(name)}</div>
+                <div class="tr-sub"><span class="tr-chip" data-role="count">${esc(String(count))}</span></div>
+              </div>
+
+              <div style="display:grid;gap:8px;justify-items:end">
+                <div class="tr-points">
+                  <span class="tr-mini">PTS</span>
+                  <input class="input" data-role="points" inputmode="numeric" placeholder="0" value="${esc(String(pval))}">
+                </div>
+                <button class="btn btn--primary" data-action="win" data-team="${esc(id)}" ${(!canWinNow || disabledWin) ? "disabled" : ""}>
+                  Definir vencedor
+                </button>
+              </div>
+            </div>
+
+            <div class="tr-list">${listHtml}</div>
+          </div>
+        `;
+      })
+      .join("");
+  }
+
+  function renderHints(tab, mode) {
+    const h1 = qs("#trCreateHint", tab);
+    const h2 = qs("#trNextHint", tab);
+    if (h1) h1.textContent = mode?.create || "—";
+    if (h2) h2.textContent = mode?.next || "—";
+  }
+
+  function applyButtons(tab, state) {
+    const btnClose = qs("#trClosePhase", tab);
+    const btnNext = qs("#trOpenNext", tab);
+    const btnStart = qs("#trStart", tab);
+    const btnFinish = qs("#trFinish", tab);
+
+    if (btnClose) btnClose.disabled = !state.canClose;
+    if (btnNext) btnNext.disabled = !state.canNext;
+    if (btnStart) btnStart.disabled = !state.canStart;
+    if (btnFinish) btnFinish.disabled = !state.canFinish;
   }
 
   async function refresh() {
@@ -184,154 +409,237 @@
     if (!tab) return;
 
     const line = qs("#trStatusLine", tab);
-    const aTitle = qs("#trTeamATitle", tab);
-    const bTitle = qs("#trTeamBTitle", tab);
-    const cTitle = qs("#trTeamCTitle", tab);
-
-    const countA = qs("#trCountA", tab);
-    const countB = qs("#trCountB", tab);
-    const countC = qs("#trCountC", tab);
-
-    const listA = qs("#trListA", tab);
-    const listB = qs("#trListB", tab);
-    const listC = qs("#trListC", tab);
-
-    const winners = qs("#trWinners", tab);
+    const createCard = qs("#trCreateCard", tab);
+    const nextCard = qs("#trNextCard", tab);
+    const winnersEl = qs("#trWinners", tab);
 
     try {
       const data = await apiFetch("/api/torneio/admin/current", { method: "GET" });
+      lastData = data || null;
 
       if (!data?.active) {
-        line.textContent = "Nenhum torneio ativo.";
-        aTitle.textContent = "Time A";
-        bTitle.textContent = "Time B";
-        cTitle.textContent = "Time C";
-        countA.textContent = "0";
-        countB.textContent = "0";
-        countC.textContent = "0";
-        setList(listA, []);
-        setList(listB, []);
-        setList(listC, []);
-        setWinners(winners, []);
+        setBadge(tab, "warn", "INATIVO");
+        setMini(tab, "Nenhum torneio ativo");
+        if (line) line.textContent = "Nenhum torneio ativo.";
+        if (createCard) createCard.style.display = "";
+        if (nextCard) nextCard.style.display = "none";
+        renderTeamsGrid(tab, null, null);
+        setWinners(winnersEl, []);
+        setCmds(tab, []);
+        renderHints(tab, {
+          create: "Dica: com o backend atual, apenas 3 times são usados (A, B, C).",
+          next: "—"
+        });
+        applyButtons(tab, { canClose: false, canNext: false, canStart: true, canFinish: false });
         return;
       }
 
       const tor = data.torneio;
       const ph = data.phase;
 
+      const phaseNumber = ph?.number ?? tor?.currentPhase ?? null;
+      const phaseStatus = String(ph?.status || "").trim();
+      const winnerTeam = String(ph?.winnerTeam || "").trim();
+
+      if (createCard) createCard.style.display = "none";
+      if (nextCard) nextCard.style.display = "";
+
+      const badgeText = tor?.name ? `ATIVO` : "ATIVO";
+      setBadge(tab, "ok", badgeText);
+      setMini(tab, tor?.name ? `Torneio: ${tor.name}` : "Torneio ativo");
+
       if (!ph) {
-        line.textContent = `Ativo: ${tor.name} • fase: ${tor.currentPhase}`;
-        setWinners(winners, data.alive || []);
+        if (line) line.textContent = `Ativo: ${tor?.name || "Torneio"} • fase: ${tor?.currentPhase || "—"}`;
+        renderTeamsGrid(tab, tor, null);
+        setWinners(winnersEl, data.alive || []);
+        setCmds(tab, []);
+        renderHints(tab, {
+          create: "—",
+          next: "Abra uma fase para aparecer os times."
+        });
+        applyButtons(tab, { canClose: false, canNext: false, canStart: false, canFinish: true });
         return;
       }
 
-      const st = String(ph.status || "");
-      const w = ph.winnerTeam ? ` • vencedor: ${ph.winnerTeam}` : "";
-      line.textContent = `Ativo: ${tor.name} • fase ${ph.number} (${st})${w}`;
+      const teams = teamsFromPhase(ph);
+      setCmds(tab, teams);
 
-      aTitle.textContent = `A • ${ph.teams?.A || "Time A"}`;
-      bTitle.textContent = `B • ${ph.teams?.B || "Time B"}`;
-      cTitle.textContent = `C • ${ph.teams?.C || "Time C"}`;
+      const wtxt = winnerTeam ? ` • vencedor: ${winnerTeam}` : "";
+      if (line) line.textContent = `Ativo: ${tor?.name || "Torneio"} • fase ${phaseNumber} (${phaseStatus || "—"})${wtxt}`;
 
-      countA.textContent = String(ph.counts?.A ?? 0);
-      countB.textContent = String(ph.counts?.B ?? 0);
-      countC.textContent = String(ph.counts?.C ?? 0);
+      renderTeamsGrid(tab, tor, ph);
+      setWinners(winnersEl, data.alive || []);
 
-      setList(listA, ph.lists?.A || []);
-      setList(listB, ph.lists?.B || []);
-      setList(listC, ph.lists?.C || []);
+      const canClose = phaseStatus === "ABERTA";
+      const canNext = phaseStatus === "DECIDIDA";
+      const canFinish = true;
+      const canStart = false;
 
-      setWinners(winners, data.alive || []);
+      applyButtons(tab, { canClose, canNext, canStart, canFinish });
+
+      renderHints(tab, {
+        create: "—",
+        next: phaseStatus === "DECIDIDA" ? "Agora você pode abrir a próxima fase." : "Dica: feche a fase e depois defina o vencedor."
+      });
     } catch (e) {
       window.notify(`Erro: ${e.message}`, "error");
     }
+  }
+
+  async function startTournament(tab) {
+    const name = (qs("#trName", tab)?.value || "Torneio").trim() || "Torneio";
+    const teams = readTeamInputs(qs("#trTeamsCreate", tab));
+    const teamA = teams[0] || "Time A";
+    const teamB = teams[1] || "Time B";
+    const teamC = teams[2] || "Time C";
+    await apiFetch("/api/torneio/admin/start", {
+      method: "POST",
+      body: JSON.stringify({ name, teamA, teamB, teamC, teams })
+    });
+    window.notify("Torneio iniciado.", "ok");
+    await refresh();
+  }
+
+  async function closePhase() {
+    await apiFetch("/api/torneio/admin/close", { method: "POST", body: "{}" });
+    window.notify("Fase fechada.", "ok");
+    await refresh();
+  }
+
+  async function decideWinner(teamId) {
+    await apiFetch("/api/torneio/admin/decide", {
+      method: "POST",
+      body: JSON.stringify({ winnerTeam: String(teamId || "").trim().toUpperCase() })
+    });
+    window.notify(`Vencedor: ${String(teamId || "").trim().toUpperCase()}`, "ok");
+    await refresh();
+  }
+
+  async function openNext(tab) {
+    const teams = readTeamInputs(qs("#trTeamsNext", tab));
+    const teamA = teams[0] || "Time A";
+    const teamB = teams[1] || "Time B";
+    const teamC = teams[2] || "Time C";
+    await apiFetch("/api/torneio/admin/open-next", {
+      method: "POST",
+      body: JSON.stringify({ teamA, teamB, teamC, teams })
+    });
+    window.notify("Próxima fase aberta.", "ok");
+    await refresh();
+  }
+
+  async function finishTournament() {
+    await apiFetch("/api/torneio/admin/finish", { method: "POST", body: "{}" });
+    window.notify("Torneio finalizado.", "ok");
+    await refresh();
+  }
+
+  async function copyWinners() {
+    const data = await apiFetch("/api/torneio/admin/winners?limit=2000", { method: "GET" });
+    const rows = data?.rows || [];
+    const text = rows.map((r) => `@${r.twitchName}`).join(" ");
+    await navigator.clipboard.writeText(text || "");
+    window.notify("Lista copiada.", "ok");
+  }
+
+  async function copyCmds(tab) {
+    const cmds = qsa(".tr-pill", qs("#trCmds", tab) || tab).map((x) => x.textContent || "").filter(Boolean);
+    const text = cmds.join(" ");
+    await navigator.clipboard.writeText(text || "");
+    window.notify("Comandos copiados.", "ok");
   }
 
   function bind() {
     const tab = ensureUI();
     if (!tab) return;
 
-    qs("#trRefresh", tab)?.addEventListener("click", refresh);
-
-    qs("#trStart", tab)?.addEventListener("click", async () => {
-      const name = qs("#trName", tab).value || "Torneio";
-      const teamA = qs("#trA", tab).value || "Time A";
-      const teamB = qs("#trB", tab).value || "Time B";
-      const teamC = qs("#trC", tab).value || "Time C";
-      try {
-        await apiFetch("/api/torneio/admin/start", {
-          method: "POST",
-          body: JSON.stringify({ name, teamA, teamB, teamC })
-        });
-        window.notify("Torneio iniciado.", "ok");
-        await refresh();
-      } catch (e) {
-        window.notify(`Erro: ${e.message}`, "error");
-      }
-    });
-
-    qs("#trOpenNext", tab)?.addEventListener("click", async () => {
-      const teamA = qs("#trNA", tab).value || "Time A";
-      const teamB = qs("#trNB", tab).value || "Time B";
-      const teamC = qs("#trNC", tab).value || "Time C";
-      try {
-        await apiFetch("/api/torneio/admin/open-next", {
-          method: "POST",
-          body: JSON.stringify({ teamA, teamB, teamC })
-        });
-        window.notify("Próxima fase aberta.", "ok");
-        await refresh();
-      } catch (e) {
-        window.notify(`Erro: ${e.message}`, "error");
-      }
-    });
-
-    qs("#trFinish", tab)?.addEventListener("click", async () => {
-      try {
-        await apiFetch("/api/torneio/admin/finish", { method: "POST", body: "{}" });
-        window.notify("Torneio finalizado.", "ok");
-        await refresh();
-      } catch (e) {
-        window.notify(`Erro: ${e.message}`, "error");
-      }
-    });
-
     tab.addEventListener("click", async (e) => {
-      const btn = e.target.closest("button.tr-win");
+      const btn = e.target.closest("button");
       if (!btn) return;
-      const winnerTeam = btn.dataset.win;
+
+      const id = btn.id || "";
+      const action = btn.dataset?.action || "";
+
       try {
-        await apiFetch("/api/torneio/admin/decide", {
-          method: "POST",
-          body: JSON.stringify({ winnerTeam })
-        });
-        window.notify(`Vencedor: ${winnerTeam}`, "ok");
-        await refresh();
+        if (id === "trRefresh") return await refresh();
+        if (id === "trStart") return await startTournament(tab);
+        if (id === "trClosePhase") return await closePhase();
+        if (id === "trOpenNext") return await openNext(tab);
+        if (id === "trFinish") return await finishTournament();
+        if (id === "trCopyWinners") return await copyWinners();
+        if (id === "trCopyCmds") return await copyCmds(tab);
+
+        if (id === "trAddTeamCreate") {
+          const box = qs("#trTeamsCreate", tab);
+          if (!box) return;
+          if (qsa('[data-team-input="1"]', box).length >= 12) return window.notify("Limite de 12 times.", "info");
+          addTeamInputRow(box, "");
+          return;
+        }
+
+        if (id === "trAddTeamNext") {
+          const box = qs("#trTeamsNext", tab);
+          if (!box) return;
+          if (qsa('[data-team-input="1"]', box).length >= 12) return window.notify("Limite de 12 times.", "info");
+          addTeamInputRow(box, "");
+          return;
+        }
+
+        if (btn.dataset?.teamRemove === "1") {
+          const row = btn.closest(".tr-team-row");
+          const box = row?.parentElement;
+          if (row && box) {
+            row.remove();
+            if (qsa('[data-team-input="1"]', box).length < 2) addTeamInputRow(box, "");
+          }
+          return;
+        }
+
+        if (action === "win") {
+          const team = btn.dataset.team;
+          if (!team) return;
+          return await decideWinner(team);
+        }
       } catch (err) {
         window.notify(`Erro: ${err.message}`, "error");
       }
     });
 
-    qs("#trCopyWinners", tab)?.addEventListener("click", async () => {
-      try {
-        const data = await apiFetch("/api/torneio/admin/winners?limit=2000", { method: "GET" });
-        const rows = data?.rows || [];
-        const text = rows.map(r => `@${r.twitchName}`).join(" ");
-        await navigator.clipboard.writeText(text || "");
-        window.notify("Lista copiada.", "ok");
-      } catch (e) {
-        window.notify("Não consegui copiar.", "error");
-      }
+    tab.addEventListener("input", (e) => {
+      const inp = e.target.closest('input[data-role="points"]');
+      if (!inp) return;
+      const card = inp.closest('[data-team-card="1"]');
+      const teamId = card?.dataset?.teamId || "";
+      const torId = lastData?.torneio?.id || "";
+      const phNum = lastData?.phase?.number || "";
+      if (!teamId || !torId || !phNum) return;
+
+      let v = String(inp.value || "").replace(/[^\d]/g, "");
+      if (v.length > 6) v = v.slice(0, 6);
+      inp.value = v;
+
+      const obj = loadPoints(torId, phNum);
+      obj[teamId] = v;
+      savePoints(torId, phNum, obj);
     });
   }
 
+  function init() {
+    if (inited) return;
+    const tab = ensureUI();
+    if (!tab) return;
+    inited = true;
+    bind();
+    refresh();
+  }
+
+  function onTabShown() {
+    refresh();
+  }
+
   document.addEventListener("DOMContentLoaded", () => {
-    if (qs("#tab-torneio")) {
-      ensureUI();
-      bind();
-      refresh();
-    }
+    if (qs("#tab-torneio")) init();
   });
 
-  window.TorneioAdmin = { refresh };
+  window.TorneioAdmin = { init, refresh, onTabShown };
 })();
