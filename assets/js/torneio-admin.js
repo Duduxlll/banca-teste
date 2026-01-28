@@ -243,15 +243,16 @@
       </div>
     `;
 
-    ensureTeamInputs(qs("#trTeamsCreate", tab), ["Time A", "Time B", "Time C"]);
-    ensureTeamInputs(qs("#trTeamsNext", tab), ["Time A", "Time B", "Time C"]);
+    ensureTeamInputs(qs("#trTeamsCreate", tab));
+    ensureTeamInputs(qs("#trTeamsNext", tab));
+
     return tab;
   }
 
   function ensureTeamInputs(container, names) {
     if (!container) return;
     const current = qsa('[data-team-input="1"]', container).map((i) => i.value);
-    const base = (names && names.length ? names : current.length ? current : ["Time A", "Time B", "Time C"]).slice(0, 12);
+    const base = (names && names.length ? names : current.length ? current : ["", ""]).slice(0, 12);
     container.innerHTML = "";
     for (const n of base) addTeamInputRow(container, n);
     if (qsa('[data-team-input="1"]', container).length < 2) addTeamInputRow(container, "");

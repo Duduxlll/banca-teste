@@ -154,26 +154,22 @@ export function initTwitchBot({
   }
 
   function resolveTeamKey(input, teams) {
-    const raw = String(input || "").trim();
-    if (!raw) return null;
+  const raw = String(input || "").trim();
+  if (!raw) return null;
 
-    const up = raw.toUpperCase();
-    if (up === "A" && teams?.[0]) return String(teams[0].key);
-    if (up === "B" && teams?.[1]) return String(teams[1].key);
-    if (up === "C" && teams?.[2]) return String(teams[2].key);
+  const k = normalizeTeamKey(raw);
+  if (!k) return null;
 
-    const k = normalizeTeamKey(raw);
-    if (!k) return null;
-
-    for (const t of teams || []) {
-      const tk = String(t.key || "");
-      const tn = String(t.name || "");
-      if (tk && normalizeTeamKey(tk) === k) return tk;
-      if (tn && normalizeTeamKey(tn) === k) return tk || k;
-    }
-
-    return null;
+  for (const t of teams || []) {
+    const tk = String(t.key || "");
+    const tn = String(t.name || "");
+    if (tk && normalizeTeamKey(tk) === k) return tk;
+    if (tn && normalizeTeamKey(tn) === k) return tk || k;
   }
+
+  return null;
+}
+
 
   function formatTeamsHint(teams, max = 6) {
     const arr = (teams || []).map((t) => String(t.name || t.key || "").trim()).filter(Boolean);

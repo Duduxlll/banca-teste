@@ -90,10 +90,7 @@ function resolveTeamInput(teams, inputRaw) {
   const input = String(inputRaw || "").trim();
   if (!input) return null;
 
-  const up = input.toUpperCase();
-  if (up === "A") return getTeamByIndex(teams, 0);
-  if (up === "B") return getTeamByIndex(teams, 1);
-  if (up === "C") return getTeamByIndex(teams, 2);
+  
 
   const num = parseInt(input.replace(/[^\d]/g, ""), 10);
   if (Number.isFinite(num) && num >= 1 && num <= (teams?.length || 0)) {
