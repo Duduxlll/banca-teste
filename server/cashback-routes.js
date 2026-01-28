@@ -72,7 +72,7 @@ export function registerCashbackRoutes({
     max: 6,
     standardHeaders: true,
     legacyHeaders: false,
-    keyGenerator: (req) => `${req.ip}|${req.get('user-agent') || ''}`
+    
   });
 
   app.post('/api/cashback/submit', requireAppKey, submitLimiter, async (req, res) => {

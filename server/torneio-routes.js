@@ -228,7 +228,7 @@ export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin
     max: 6,
     standardHeaders: true,
     legacyHeaders: false,
-    keyGenerator: (req) => `${req.ip}|${req.get("user-agent") || ""}`,
+   
   });
 
   app.get("/api/torneio/state", requireAppKey, async (req, res) => {
