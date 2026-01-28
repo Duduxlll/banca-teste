@@ -452,7 +452,7 @@ export function initTwitchBot({
 
       if (cmd.type === "cashback") {
         const mention = userTag ? `@${userTag}` : `@${user}`;
-        await say(`${mention} envie o print do cadastro/depósito 👉 ${publicUrl} • depois use !status`);
+        await say(`${mention} Cadastre-se na !borawin ou !melbet e envie o print do deposito feito na data de hoje 👉 ${publicUrl} • depois use !status`);
         return;
       }
 
