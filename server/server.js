@@ -67,7 +67,7 @@ const __dirname  = path.dirname(__filename);
 const PUBLIC_ROOT  = path.resolve(__dirname, '..', 'public');
 const PRIVATE_ROOT = path.resolve(__dirname, '..', 'private');
 
-
+const ROOT = PUBLIC_ROOT;
 
 const pool = new Pool({
   connectionString: DATABASE_URL,
