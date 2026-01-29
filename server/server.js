@@ -64,7 +64,8 @@ if (!DATABASE_URL) {
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
-const ROOT       = path.resolve(__dirname, STATIC_ROOT || '..');
+const ROOT = path.resolve(__dirname, '..', 'public');
+
 
 const pool = new Pool({
   connectionString: DATABASE_URL,
@@ -131,6 +132,13 @@ app.use((req, res, next) => {
   );
   next();
 });
+
+app.get(['/area', '/area.html'], (req, res) => {
+  const token = req.cookies?.session;
+  if (!token || !verifySession(token)) return res.redirect('/login.html');
+  return res.sendFile(path.join(ROOT, 'area.html'));
+});
+
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(express.json({ limit: '8mb' }));
@@ -1034,11 +1042,7 @@ app.get('/api/auth/me', (req, res) => {
   return res.json({ user: { username: data.sub } });
 });
 
-app.get('/area.html', (req, res) => {
-  const token = req.cookies?.session;
-  if (!token || !verifySession(token)) return res.redirect('/login.html');
-  return res.sendFile(path.join(ROOT, 'area.html'));
-});
+
 
 app.get('/health', async (req, res) => {
   try {
