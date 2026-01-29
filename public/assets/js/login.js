@@ -22,7 +22,7 @@ form.addEventListener('submit', async (e)=>{
       return;
     }
     
-    location.href = 'private/area.html';
+    location.href = '/area.html';
   }catch(e){
     err.textContent = 'Erro de rede.';
   }

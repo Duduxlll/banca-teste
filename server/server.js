@@ -135,11 +135,7 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get(['/area', '/area.html'], (req, res) => {
-  const token = req.cookies?.session;
-  if (!token || !verifySession(token)) return res.redirect('/login.html');
-  return res.sendFile(path.join(ROOT, 'private/area.html'));
-});
+
 
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
@@ -148,6 +144,13 @@ app.use(express.json({ limit: '8mb' }));
 app.use(cookieParser());
 app.use(cors({ origin: ORIGIN, credentials: true }));
 app.use(express.static(ROOT, { extensions: ['html'] }));
+
+app.get(['/area', '/area.html'], (req, res) => {
+  const token = req.cookies?.session;
+  if (!token || !verifySession(token)) return res.redirect('/login.html');
+  return res.sendFile(path.join(PRIVATE_ROOT, 'area.html'));
+});
+
 
 const loginLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
