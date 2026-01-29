@@ -64,7 +64,9 @@ if (!DATABASE_URL) {
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
-const ROOT = path.resolve(__dirname, '..', 'public');
+const PUBLIC_ROOT  = path.resolve(__dirname, '..', 'public');
+const PRIVATE_ROOT = path.resolve(__dirname, '..', 'private');
+
 
 
 const pool = new Pool({
@@ -136,7 +138,7 @@ app.use((req, res, next) => {
 app.get(['/area', '/area.html'], (req, res) => {
   const token = req.cookies?.session;
   if (!token || !verifySession(token)) return res.redirect('/login.html');
-  return res.sendFile(path.join(ROOT, 'area.html'));
+  return res.sendFile(path.join(ROOT, 'private/area.html'));
 });
 
 
